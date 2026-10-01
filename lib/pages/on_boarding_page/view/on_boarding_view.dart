@@ -1,0 +1,135 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:shortie/main.dart';
+import 'package:shortie/pages/on_boarding_page/controller/on_boarding_controller.dart';
+import 'package:shortie/pages/on_boarding_page/widget/on_boarding_widget.dart';
+import 'package:shortie/ui/gradient_text_ui.dart';
+import 'package:shortie/utils/asset.dart';
+import 'package:shortie/utils/color.dart';
+import 'package:shortie/utils/constant.dart';
+import 'package:shortie/utils/enums.dart';
+import 'package:shortie/utils/font_style.dart';
+
+class OnBoardingView extends GetView<OnBoardingController> {
+  const OnBoardingView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) => controller.onPopScope(),
+      child: Scaffold(
+        body: Stack(
+          children: [
+            SizedBox(
+              height: Get.height,
+              width: Get.width,
+              child: Image.asset(AppAsset.imgGradiantBg, fit: BoxFit.cover),
+            ),
+            SizedBox(
+              height: Get.height,
+              width: Get.width,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: GetBuilder<OnBoardingController>(
+                      id: "onChangePage",
+                      builder: (controller) => PageView.builder(
+                        itemCount: controller.pages.length,
+                        onPageChanged: (value) => controller.onChangePage(value),
+                        itemBuilder: (context, index) => controller.pages[controller.currentPage],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: Get.width,
+                    decoration: BoxDecoration(
+                      gradient: AppColor.primaryLinearGradient,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(45),
+                        topRight: Radius.circular(45),
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        32.height,
+                        GetBuilder<OnBoardingController>(
+                          id: "onChangePage",
+                          builder: (controller) => Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 25),
+                            child: Text(
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              controller.pageTitle[controller.currentPage],
+                              style: TextStyle(
+                                color: AppColor.white,
+                                fontFamily: AppConstant.appFontBold,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                                fontSize: 32,
+                              ),
+                            ),
+                          ),
+                        ),
+                        17.height,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          child: GetBuilder<OnBoardingController>(
+                            id: "onChangePage",
+                            builder: (controller) => Text(
+                              controller.pageSubTitle[controller.currentPage],
+                              textAlign: TextAlign.center,
+                              style: AppFontStyle.styleW400(AppColor.white.withValues(alpha:0.9), 15),
+                            ),
+                          ),
+                        ),
+                        22.height,
+                        GetBuilder<OnBoardingController>(
+                          id: "onChangePage",
+                          builder: (controller) => DotIndicatorUi(index: controller.currentPage),
+                        ),
+                        27.height,
+                        GestureDetector(
+                          onTap: () => controller.onClickNext(),
+                          child: Container(
+                            height: 56,
+                            width: Get.width * 0.7,
+                            constraints: BoxConstraints(maxWidth: 280, minWidth: 160),
+                            margin: EdgeInsets.only(bottom: 32),
+                            decoration: BoxDecoration(
+                              color: AppColor.white,
+                              borderRadius: BorderRadius.circular(50),
+                              boxShadow: [
+                                BoxShadow(color: AppColor.black.withValues(alpha:0.4), blurRadius: 2),
+                              ],
+                            ),
+                            child: Center(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                  child: GradientTextUi(
+                                    EnumLocal.txtNext.name.tr,
+                                    gradient: AppColor.primaryLinearGradient,
+                                    style: AppFontStyle.styleW700(AppColor.white, 22),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

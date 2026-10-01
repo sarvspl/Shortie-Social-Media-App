@@ -1,0 +1,250 @@
+{
+  "project_info": {
+    "project_number": "62445718384",
+    "project_id": "shortie-8bb7c",
+    "storage_bucket": "shortie-8bb7c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62445718384:android:32dbdaf2aec9af23d49db5",
+        "android_client_info": {
+          "package_name": "com.incodes.shortie"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "62445718384-289cnitvrtc2nmn3v7bteu0amc3umbil.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "59fe1e6a0f6c18e17393f1fcd05691319c3aeadb"
+          }
+        },
+        {
+          "client_id": "62445718384-3d4bmkevcv3d43j5bu6skpc3q1u4hl3b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "66e21b469b6e9276b16b99ec4d1b31ed695dad52"
+          }
+        },
+        {
+          "client_id": "62445718384-4shpeid3hmhp8s3f5o3vg1282mt61kar.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "1965f47f7cc9e090db87690206aef583481924a2"
+          }
+        },
+        {
+          "client_id": "62445718384-5misij0ppr3g009io8gki3g0ij5t4310.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "625768d98ff6f05ddc9910f23cf31318661a2eb3"
+          }
+        },
+        {
+          "client_id": "62445718384-8uhdvffiiccd6kj38qaqvunpjjh3200s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "fd83e7d353abe483ba426d829e794ae398ec91e2"
+          }
+        },
+        {
+          "client_id": "62445718384-8vmvmlu7satvpg0vuunq58s8o9c2nubg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "facdce208b203b5410ea23cdaaa94a341069b833"
+          }
+        },
+        {
+          "client_id": "62445718384-a6k7b8tjdse461ndtbeus6qnd47djgeh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "8919e4cb81f8b5499097e6403a9cb01df217253f"
+          }
+        },
+        {
+          "client_id": "62445718384-ad2li1hhheijmvtos82od6s2f6g1fj0k.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "2409367921ea9a5088d3938f1935c87c624615f1"
+          }
+        },
+        {
+          "client_id": "62445718384-bdohfjtubauje8irkl4rea4o43rlum77.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "d2b4be5182bb7d0e840ab1e14d20a374f3406f72"
+          }
+        },
+        {
+          "client_id": "62445718384-cbtgn91brlcsiq8m55hb1276o5tvq79p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "4236b2983cb53ac9c2ccfa397a009ef95a29a0f9"
+          }
+        },
+        {
+          "client_id": "62445718384-g8562rfbdt20tfojde51m89n23uh73l7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "e64eb2db8decac14eb76afc5b201634b43c2c5cd"
+          }
+        },
+        {
+          "client_id": "62445718384-iqu4qm2t48dae6on96ibu4st4igrhc4u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "56975946097ad8ac71b1ab844f788698e3cae53b"
+          }
+        },
+        {
+          "client_id": "62445718384-ubhakvlg3p0q64dlojs7jiuasnn1o2pg.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "3c1a1daebe41c20622eb6de28f0a4f1fa3aa8159"
+          }
+        },
+        {
+          "client_id": "62445718384-utajn1mmdmr3je3hcgq2uvt811t3iphv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "60d5d60d44bebd396b095c23310d6e155b5eb17a"
+          }
+        },
+        {
+          "client_id": "62445718384-v6fn2e2a4gvj2iaco7tvsr6omj2k330s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.incodes.shortie",
+            "certificate_hash": "ae78741b96bc412c018c2398a45c6fceb6f89616"
+          }
+        },
+        {
+          "client_id": "62445718384-d415spsbkcd86ml1f3lqoe3cme2o2okm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtS2Q3ghLuXsCNd6IrlpoLiu2CD9yc7b8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "62445718384-d415spsbkcd86ml1f3lqoe3cme2o2okm.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "62445718384-8djj0eqqvfbhf01bjj57c0to9usrkv06.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shortie.live"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:62445718384:android:55d8c25154c80480d49db5",
+        "android_client_info": {
+          "package_name": "com.shortie.live"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "62445718384-apedrt9f8fm8ndp6u7lg3r7kl1n0hsc3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "3c1a1daebe41c20622eb6de28f0a4f1fa3aa8159"
+          }
+        },
+        {
+          "client_id": "62445718384-f9pfapgvgh7m2qnlsiav979lks9a7l7v.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "1965f47f7cc9e090db87690206aef583481924a2"
+          }
+        },
+        {
+          "client_id": "62445718384-n81555og31jrfpaqepheu229170a2o40.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "ba45e4fd4e778f1c05dbe7662dd0e6916a604ad9"
+          }
+        },
+        {
+          "client_id": "62445718384-nv05ntuuk3oftarigvsds48tiocvekh0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "e64eb2db8decac14eb76afc5b201634b43c2c5cd"
+          }
+        },
+        {
+          "client_id": "62445718384-s3e5hmlnnivi78he0terbu0enj22q6aa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "fd83e7d353abe483ba426d829e794ae398ec91e2"
+          }
+        },
+        {
+          "client_id": "62445718384-vuro92n37h4dd5matlknf2pdaclrpt2b.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.shortie.live",
+            "certificate_hash": "97c198100bb27e82a1c25c009772058043f339f2"
+          }
+        },
+        {
+          "client_id": "62445718384-d415spsbkcd86ml1f3lqoe3cme2o2okm.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtS2Q3ghLuXsCNd6IrlpoLiu2CD9yc7b8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "62445718384-d415spsbkcd86ml1f3lqoe3cme2o2okm.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "62445718384-8djj0eqqvfbhf01bjj57c0to9usrkv06.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.shortie.live"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

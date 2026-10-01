@@ -1,0 +1,366 @@
+import 'dart:async';
+
+import 'package:blurrycontainer/blurrycontainer.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:get/get_rx/src/rx_typedefs/rx_typedefs.dart';
+import 'package:shortie/shimmer/comment_shimmer_ui.dart';
+import 'package:shortie/ui/no_data_found_ui.dart';
+import 'package:shortie/ui/preview_network_image_ui.dart';
+import 'package:shortie/main.dart';
+import 'package:shortie/pages/splash_screen_page/api/create_comment_api.dart';
+import 'package:shortie/pages/splash_screen_page/api/fetch_comment_api.dart';
+import 'package:shortie/pages/splash_screen_page/model/comment_model.dart';
+import 'package:shortie/pages/fake_live_page/widget/fake_comment_data.dart';
+import 'package:shortie/utils/asset.dart';
+import 'package:shortie/utils/color.dart';
+import 'package:shortie/utils/database.dart';
+import 'package:shortie/utils/enums.dart';
+import 'package:shortie/utils/font_style.dart';
+import 'package:shortie/utils/utils.dart';
+
+class CommentBottomSheetUi {
+  static RxBool isLoading = false.obs;
+  static CommentModel? commentModel;
+  static RxList<PostOrVideoComment> comments = <PostOrVideoComment>[].obs;
+  static TextEditingController commentController = TextEditingController();
+  static ScrollController scrollController = ScrollController();
+
+  static Future<void> onGetComments({
+    required int commentType,
+    required String commentTypeId,
+    bool showFakeComment = false,
+  }) async {
+    isLoading.value = true;
+    comments.clear();
+    commentModel = await FetchCommentApi.callApi(
+      loginUserId: Database.loginUserId,
+      commentType: commentType,
+      commentTypeId: commentTypeId,
+    );
+
+    if (commentModel?.postOrVideoComment != null) {
+      isLoading.value = false;
+
+      final commentList = commentModel?.postOrVideoComment ?? [];
+
+      comments.addAll(commentList.reversed);
+
+      if (comments.isEmpty && showFakeComment) {
+        comments.addAll(fakeHostCommentListBlank.map((e) => PostOrVideoComment(
+              name: e.user,
+              commentText: e.message,
+              userImage: e.image,
+              isProfileImageBanned: false,
+              time: "2 hours ago",
+            )));
+      }
+
+      onScrollDown(true);
+    }
+  }
+
+  static Future<void> onSendComment({
+    required int commentType,
+    required String commentTypeId,
+  }) async {
+    if (commentController.text.trim().isNotEmpty) {
+      final commentText = commentController.text;
+
+      comments.add(
+        PostOrVideoComment(
+          name: Database.fetchLoginUserProfileModel?.user?.name ?? "",
+          userImage: Database.fetchLoginUserProfileModel?.user?.image ?? "",
+          commentText: commentText,
+          isProfileImageBanned: Database.fetchLoginUserProfileModel?.user?.isProfileImageBanned ?? false,
+          time: "Now",
+        ),
+      );
+      commentController.clear();
+
+      onScrollDown(false);
+
+      await CreateCommentApi.callApi(
+        loginUserId: Database.loginUserId,
+        commentType: commentType,
+        commentTypeId: commentTypeId,
+        commentText: commentText,
+      );
+    }
+  }
+
+  static void onScrollDown(bool isJump) async {
+    try {
+      if (isJump) {
+        await 100.milliseconds.delay();
+        scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      } else {
+        await 300.milliseconds.delay();
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 500),
+          curve: Curves.fastOutSlowIn,
+        );
+      }
+    } catch (e) {
+      Utils.showLog("Comment Scroll Down Failed => $e");
+    }
+  }
+
+  static String onFormatTime(String time) {
+    List<String> parts = time.split(' ');
+
+    if (parts.length == 3 && parts[2] == 'ago' && parts[1] == 'minutes' && parts[0].isNotEmpty) {
+      return '${parts[0]}m';
+    } else if (parts.length == 3 && parts[2] == 'ago' && parts[1] == 'hours' && parts[0].isNotEmpty) {
+      return '${parts[0]}h';
+    } else if (parts.length == 3 && parts[2] == 'ago' && parts[1] == 'seconds' && parts[0].isNotEmpty) {
+      return '${parts[0]}s';
+    } else {
+      return time;
+    }
+  }
+
+  static Future<int> show({
+    required BuildContext context,
+    required int commentType,
+    required String commentTypeId,
+    required int totalComments,
+    Callback? onComplete,
+    bool showFakeComment = false,
+  }) async {
+    onGetComments(commentType: commentType, commentTypeId: commentTypeId, showFakeComment: showFakeComment);
+
+    await showModalBottomSheet(
+      isScrollControlled: true,
+      scrollControlDisabledMaxHeightRatio: Get.height,
+      context: context,
+      backgroundColor: AppColor.transparent,
+      builder: (context) => Padding(
+        padding: MediaQuery.of(context).viewInsets,
+        child: Container(
+          height: 500,
+          width: Get.width,
+          clipBehavior: Clip.antiAlias,
+          decoration: const BoxDecoration(
+            color: AppColor.white,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(40),
+              topRight: Radius.circular(40),
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                height: 65,
+                color: AppColor.grey_100,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Spacer(),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          height: 4,
+                          width: 35,
+                          decoration: BoxDecoration(
+                            color: AppColor.colorTextDarkGrey,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        10.height,
+                        Text(
+                          EnumLocal.txtComment.name.tr,
+                          style: AppFontStyle.styleW700(AppColor.black, 17),
+                        ),
+                      ],
+                    ).paddingOnly(left: 50),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () => Get.back(),
+                      child: Container(
+                        height: 30,
+                        width: 30,
+                        margin: const EdgeInsets.only(right: 20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColor.transparent,
+                          border: Border.all(color: AppColor.black),
+                        ),
+                        child: Center(
+                          child: Image.asset(
+                            width: 18,
+                            AppAsset.icClose,
+                            color: AppColor.black,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Obx(
+                  () => isLoading.value
+                      ? CommentShimmerUi()
+                      : comments.isEmpty
+                          ? NoDataFoundUi(iconSize: 160, fontSize: 19)
+                          : SingleChildScrollView(
+                              controller: scrollController,
+                              child: ListView.builder(
+                                itemCount: comments.length,
+                                shrinkWrap: true,
+                                padding: const EdgeInsets.only(top: 15, left: 15, right: 15),
+                                physics: NeverScrollableScrollPhysics(),
+                                itemBuilder: (context, index) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 20),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                          height: 45,
+                                          width: 45,
+                                          clipBehavior: Clip.antiAlias,
+                                          decoration: BoxDecoration(shape: BoxShape.circle),
+                                          child: Stack(
+                                            children: [
+                                              AspectRatio(
+                                                aspectRatio: 1,
+                                                child: Image.asset(AppAsset.icProfilePlaceHolder),
+                                              ),
+                                              AspectRatio(
+                                                aspectRatio: 1,
+                                                child: PreviewNetworkImageUi(image: comments[index].userImage),
+                                              ),
+                                              Visibility(
+                                                visible: comments[index].isProfileImageBanned ?? false,
+                                                child: AspectRatio(
+                                                  aspectRatio: 1,
+                                                  child: Container(
+                                                    clipBehavior: Clip.antiAlias,
+                                                    decoration: BoxDecoration(shape: BoxShape.circle),
+                                                    child: BlurryContainer(
+                                                      blur: 3,
+                                                      borderRadius: BorderRadius.circular(50),
+                                                      color: AppColor.black.withValues(alpha: 0.3),
+                                                      child: Offstage(),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          )),
+                                      12.width,
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            RichText(
+                                              text: TextSpan(
+                                                text: comments[index].name,
+                                                style: AppFontStyle.styleW700(AppColor.black, 15),
+                                                children: [
+                                                  TextSpan(
+                                                    text: "   ${onFormatTime(comments[index].time ?? "")}",
+                                                    style: AppFontStyle.styleW600(AppColor.colorGreyHasTagText, 14),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            5.height,
+                                            Text(
+                                              comments[index].commentText ?? "",
+                                              style: AppFontStyle.styleW500(AppColor.colorDarkGrey, 14),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                ),
+              ),
+              CommentTextFieldUi(
+                controller: commentController,
+                onSend: () {
+                  onSendComment(commentType: commentType, commentTypeId: commentTypeId);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).whenComplete(() => onComplete?.call());
+    return comments.isEmpty ? totalComments : comments.length;
+  }
+}
+
+class CommentTextFieldUi extends StatelessWidget {
+  const CommentTextFieldUi({
+    super.key,
+    required this.onSend,
+    required this.controller,
+  });
+
+  final Callback onSend;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.only(left: 15, right: 5),
+      alignment: Alignment.center,
+      margin: EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        color: AppColor.colorBorder.withValues(alpha: 0.3),
+        border: Border.all(color: AppColor.colorBorder.withValues(alpha: 0.6)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Image.asset(
+            height: 22,
+            width: 22,
+            AppAsset.icCommentGradiant,
+          ),
+          5.width,
+          VerticalDivider(
+            indent: 12,
+            endIndent: 12,
+            color: AppColor.coloGreyText.withValues(alpha: 0.3),
+          ),
+          5.width,
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              cursorColor: AppColor.colorTextGrey,
+              maxLines: 1,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.only(bottom: 3),
+                hintText: EnumLocal.txtTypeComment.name.tr,
+                hintStyle: AppFontStyle.styleW400(AppColor.coloGreyText, 14.5),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onSend,
+            child: Container(
+              height: 40,
+              width: 40,
+              color: AppColor.transparent,
+              child: Center(child: Image.asset(width: 25, AppAsset.icSend)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

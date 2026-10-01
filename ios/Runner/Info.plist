@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>Shortie</string> <!--Enter Your App Name Ex:- Xyz --> <!-- CREDENTIAL -->
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>shortie</string><!--Enter Your App Name In Small Character Ex:- xyz --> <!-- CREDENTIAL -->
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+
+	<!-- FIREBASE CODE START -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+		    <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLName</key>
+            <string>com.shortie.live</string><!--Enter Your Package Name Ex:- com.xyz.live --> <!-- CREDENTIAL -->
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.62445718384-8djj0eqqvfbhf01bjj57c0to9usrkv06</string><!-- Change Your REVERSED_CLIENT_ID --> <!-- CREDENTIAL -->
+				<string></string>
+			</array>
+		</dict>
+
+        <!-- DEEP LINKS CODE START -->
+		<dict>
+        	<key>CFBundleTypeRole</key>
+        	<string>Editor</string>
+        	<key>CFBundleURLName</key>
+        	<string>com.shortie.live</string><!--Enter Your App Name In Small Character.app Ex:- xyz --> <!-- CREDENTIAL -->
+        	<key>CFBundleURLSchemes</key>
+        	<array>
+        		<string>shortie</string><!--Enter Your App Name In Small Character Ex:- xyz --> <!-- CREDENTIAL -->
+        		<string>myapplication</string>
+        	</array>
+        </dict>
+        <!-- DEEP LINKS CODE END -->
+	</array>
+	<!-- FIREBASE CODE END -->
+
+	<!-- DEEP LINKS CODE START -->
+    <key>com.apple.developer.associated-domains</key>
+    <array>
+    	<string>applinks:shortie.codderlab.com</string>  <!--applinks:Enter Your Domain Ex:- yourdomain.com --> <!-- CREDENTIAL -->
+    </array>
+    <!-- DEEP LINKS CODE END -->
+
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+    <false/>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+
+    <!-- APP PERMISSION CODE START -->
+	<key>NSCameraUsageDescription</key>
+    <string>Take a photo for display</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Take a video for display</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Read your photos for display</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>My description about why I need this capability</string>
+    <key>PHPhotoLibraryPreventAutomaticLimitedAccessAlert</key>
+    <true/>
+    <key>UIApplicationSupportsIndirectInputEvents</key>
+    <true/>
+    <key>UIBackgroundModes</key>
+    <array>
+    	<string>fetch</string>
+    	<string>remote-notification</string>
+    </array>
+    <!-- APP PERMISSION CODE END -->
+
+	<key>GADApplicationIdentifier</key>
+    	<string>ca-app-pub-3940256099942544~3347511713</string>
+</dict>
+</plist>
