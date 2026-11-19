@@ -3,7 +3,7 @@ name: shortie
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -53,7 +53,6 @@ dependencies:
   #  audioplayers: ^6.4.0
   deepar_flutter_plus: ^0.2.0
   zego_express_engine: ^3.21.0
-  #  zego_express_engine: ^3.20.5
   encrypt: ^5.0.3
   native_device_orientation: ^2.0.3
   flutter_svg: ^2.2.0
@@ -170,8 +169,6 @@ flutter:
     - assets/story_design_icons/
     - assets/images/
     - assets/lottie/
-    - assets/effects/
-    - assets/effects/
 
   fonts:
     - family: SfProRegular
