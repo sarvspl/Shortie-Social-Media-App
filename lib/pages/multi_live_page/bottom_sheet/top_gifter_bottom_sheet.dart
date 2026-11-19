@@ -15,8 +15,8 @@ import 'package:shortie/utils/socket_services.dart';
 import 'package:shortie/utils/utils.dart';
 
 class ViewersBottomSheet extends StatefulWidget {
-  ViewersBottomSheet({super.key, this.initialIndex});
-  int? initialIndex;
+  final int? initialIndex;
+  const ViewersBottomSheet({super.key, this.initialIndex});
   @override
   _ViewersBottomSheetState createState() => _ViewersBottomSheetState();
 }

@@ -65,106 +65,110 @@ class InviteUserForMultiLiveBottomSheet {
             ),
             10.height,
             Expanded(
-              child: GetBuilder<MultiLiveController>(
-                id: "onGetLiveUserList",
-                builder: (controller) => controller.isLoadingLiveUserList
-                    ? Center(child: CircularProgressIndicator())
-                    : SocketServices.liveViewers.isEmpty
-                        ? Center(
-                            child: Text(
-                              "Live User Not Available",
-                              style: AppFontStyle.styleW700(AppColor.black, 17),
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: SocketServices.liveViewers.length,
-                            itemBuilder: (context, index) {
-                              final indexData = SocketServices.liveViewers[index];
-                              return GestureDetector(
-                                onTap: () async {
-                                  if (indexData['userId'] == Database.loginUserId) {
-                                    Utils.showToast("You can't invite yourself");
-                                    Get.back();
-                                    return;
-                                  } else if (controller.requestedList?.any((element) => element.userId == indexData['userId'] && element.isAccepted == true && element.agoraUid != "") == true) {
-                                    Utils.showToast("This user is already in the live");
+              child: Obx(
+                () => SocketServices.liveViewers.isEmpty
+                    ? Center(
+                        child: Text(
+                          "Live User Not Available",
+                          style: AppFontStyle.styleW700(AppColor.black, 17),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: SocketServices.liveViewers.length,
+                        itemBuilder: (context, index) {
+                          final indexData = SocketServices.liveViewers[index];
+                          final targetId = indexData['userId']?.toString() ?? "";
+                          final targetName = indexData['name'] ?? indexData['userName'] ?? "User";
+                          final targetImage = indexData['image'] ?? "";
+                          final controller = Get.find<MultiLiveController>();
 
+                          return GestureDetector(
+                            onTap: () async {
+                              if (targetId == Database.loginUserId) {
+                                Utils.showToast("You can't invite yourself");
+                                Get.back();
+                                return;
+                              } else if (controller.requestedList?.any((element) => element.userId == targetId && element.isAccepted == true && element.agoraUid != "") == true) {
+                                Utils.showToast("This user is already in the live");
+                                Get.back();
+                                return;
+                              } else if (controller.requestedList?.any((element) => element.userId == targetId && element.isRequested == true) == true) {
+                                Utils.showToast("You have already sent a request to this user");
+                                Get.back();
+                                return;
+                              } else {
+                                Utils.showLog("Join request ==> $targetId ${Database.loginUserId}");
+                                await controller
+                                    .onSendMultiLiveRequestOnSocketForUser(
+                                  name: targetName,
+                                  image: targetImage,
+                                  userName: indexData['userName'] ?? "",
+                                  userId: targetId,
+                                  coHost: targetId,
+                                  country: indexData['country'] ?? "",
+                                  countryFlagImage: indexData['countryFlagImage'] ?? "",
+                                  isVerified: indexData['isVerified'] ?? false,
+                                  position: postion,
+                                  liveUserObjId: (indexData['liveUserId'] != null && indexData['liveUserId'].toString().isNotEmpty) ? indexData['liveUserId'].toString() : controller.liveUserObjId,
+                                  liveHistoryId: (indexData['liveHistoryId'] != null && indexData['liveHistoryId'].toString().isNotEmpty) ? indexData['liveHistoryId'].toString() : controller.roomID,
+                                )
+                                    .then(
+                                  (value) {
                                     Get.back();
-                                    return;
-                                  } else if (controller.requestedList?.any((element) => element.userId == indexData['userId'] && element.isRequested == true) == true) {
-                                    Utils.showToast("You have already sent a request to this user");
-                                    Get.back();
-                                    return;
-                                  } else {
-                                    Utils.showLog("Join request ==> ${indexData['userId']} ${Database.loginUserId}");
-                                    await controller
-                                        .onSendMultiLiveRequestOnSocketForUser(
-                                      name: indexData['name'] ?? "",
-                                      image: indexData['image'] ?? "",
-                                      userName: indexData['userName'] ?? "",
-                                      userId: indexData['userId'] ?? "",
-                                      coHost: indexData['userId'] ?? "",
-                                      country: indexData['country'] ?? "",
-                                      countryFlagImage: indexData['countryFlagImage'] ?? "",
-                                      isVerified: indexData['isVerified'] ?? false,
-                                      position: postion,
-                                      liveUserObjId: indexData['liveUserId'] ?? "",
-                                      liveHistoryId: indexData['liveHistoryId'] ?? "",
-                                    )
-                                        .then(
-                                      (value) {
-                                        Get.back();
-                                        Utils.showToast("Join request sent successfully");
-                                      },
-                                    );
-                                    Utils.showLog("Join request ==> ${indexData}");
-                                  }
-                                  // callback();
-                                },
-                                child: Container(
-                                  height: 60,
-                                  width: Get.width,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade300,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  margin: EdgeInsets.only(bottom: 10, left: 15, right: 15),
-                                  padding: EdgeInsets.only(left: 10, right: 10, top: 5, bottom: 5),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: [
-                                      Container(
-                                        height: 55,
-                                        width: 55,
-                                        clipBehavior: Clip.antiAlias,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(shape: BoxShape.circle),
-                                        child: Stack(
-                                          children: [
-                                            AspectRatio(
-                                              aspectRatio: 1,
-                                              child: Image.asset(AppAsset.icProfilePlaceHolder, fit: BoxFit.cover),
-                                            ),
-                                            AspectRatio(
-                                              aspectRatio: 1,
-                                              child: PreviewNetworkImageUi(
-                                                image: indexData['image'] ?? "",
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      10.width,
-                                      Text(
-                                        indexData['name'] ?? "",
-                                        style: AppFontStyle.styleW700(AppColor.black, 17),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
+                                    Utils.showToast("Join request sent successfully");
+                                  },
+                                );
+                                Utils.showLog("Join request ==> ${indexData}");
+                              }
                             },
-                          ),
+                            child: Container(
+                              height: 60,
+                              width: Get.width,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              margin: const EdgeInsets.only(bottom: 10, left: 15, right: 15),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    height: 55,
+                                    width: 55,
+                                    clipBehavior: Clip.antiAlias,
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(shape: BoxShape.circle),
+                                    child: Stack(
+                                      children: [
+                                        AspectRatio(
+                                          aspectRatio: 1,
+                                          child: Image.asset(AppAsset.icProfilePlaceHolder, fit: BoxFit.cover),
+                                        ),
+                                        AspectRatio(
+                                          aspectRatio: 1,
+                                          child: PreviewNetworkImageUi(
+                                            image: targetImage,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  10.width,
+                                  Expanded(
+                                    child: Text(
+                                      targetName,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppFontStyle.styleW700(AppColor.black, 17),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ),
           ],

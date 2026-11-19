@@ -10,6 +10,8 @@ import 'package:shortie/utils/asset.dart';
 import 'package:shortie/utils/color.dart';
 import 'package:shortie/utils/database.dart';
 import 'package:shortie/utils/font_style.dart';
+import 'package:shortie/utils/socket_services.dart';
+import 'package:shortie/utils/utils.dart';
 
 class JoinMultiLiveRequestBottomSheetWidget {
   static Future<void> show() async {
@@ -58,11 +60,11 @@ class JoinMultiLiveRequestBottomSheetWidget {
                               Get.back();
 
                               controller.onSendMultiLiveRequestOnSocket();
-                              // Utils.showToast("Join request send success");
+                              Utils.showToast("Request sent to host. Waiting for approval...");
                             },
                             child: Container(
                               height: 35,
-                              width: 60,
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
                               alignment: Alignment.center,
                               margin: EdgeInsets.only(right: 15),
                               decoration: BoxDecoration(
@@ -70,8 +72,8 @@ class JoinMultiLiveRequestBottomSheetWidget {
                                 borderRadius: BorderRadius.circular(30),
                               ),
                               child: Text(
-                                "Join",
-                                style: AppFontStyle.styleW600(AppColor.white, 14),
+                                "Request to Join",
+                                style: AppFontStyle.styleW600(AppColor.white, 13),
                               ),
                             ),
                           ),
@@ -103,10 +105,16 @@ class JoinMultiLiveRequestBottomSheetWidget {
                                 final indexData = controller.multiLiveRequestedList[index];
                                 return indexData.userId == Database.loginUserId
                                     ? UserItemWidget(
-                                        title: controller.name,
-                                        subTitle: controller.userName,
-                                        leading: controller.image,
-                                        isVerified: false,
+                                        title: (indexData.name != null && indexData.name!.isNotEmpty)
+                                            ? indexData.name!
+                                            : (Database.fetchLoginUserProfileModel?.user?.name ?? ""),
+                                        subTitle: (indexData.userName != null && indexData.userName!.isNotEmpty)
+                                            ? indexData.userName!
+                                            : (Database.fetchLoginUserProfileModel?.user?.userName ?? ""),
+                                        leading: (indexData.image != null && indexData.image!.isNotEmpty)
+                                            ? indexData.image!
+                                            : (Database.fetchLoginUserProfileModel?.user?.image ?? ""),
+                                        isVerified: indexData.isVerified ?? false,
                                         isInvited: indexData.isInvited ?? false,
                                         isRequested: indexData.isRequested ?? false,
                                         isAccepted: indexData.isAccepted ?? false,
@@ -114,6 +122,17 @@ class JoinMultiLiveRequestBottomSheetWidget {
                                           if (indexData.isAccepted == true) {
                                             Get.back();
                                             controller.onLeftMultiLiveOnSocket();
+                                          } else {
+                                            Get.back();
+                                            SocketServices().onEmitRemoveCallJoinRequest(
+                                              userId: indexData.userId ?? Database.loginUserId,
+                                              liveHistoryId: controller.roomID,
+                                              liveUserObjId: controller.liveUserObjId,
+                                              coHostRequestPosition: indexData.position ?? 0,
+                                              isMute: indexData.isMute ?? false,
+                                              isCameraEnabled: indexData.isCameraEnabled ?? false,
+                                            );
+                                            Utils.showToast("Request cancelled");
                                           }
                                         },
                                       )

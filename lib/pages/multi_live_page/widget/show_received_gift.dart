@@ -78,14 +78,36 @@ class ShowReceivedGift {
               opacity: 0.99,
               curve: Curves.easeInToLinear,
               duration: Duration(milliseconds: 500),
-              child: Container(
-                height: giftList[0].giftType == 3 ? Get.height : 250,
-                width: giftList[0].giftType == 3 ? Get.width : 250,
-                color: AppColor.transparent,
-                child: PreviewGiftWidget(
-                  url: giftList[0].giftUrl,
-                  type: giftList[0].giftType,
-                  whenCompleteSVGA: () => onCompleteGiftShow(),
+              child: Align(
+                alignment: giftList[0].giftType == 3 ? Alignment.center : const Alignment(0, 0.08),
+                child: Container(
+                  height: giftList[0].giftType == 3 ? Get.height : 110,
+                  width: giftList[0].giftType == 3 ? Get.width : 110,
+                  clipBehavior: giftList[0].giftType == 3 ? Clip.none : Clip.antiAlias,
+                  decoration: giftList[0].giftType == 3
+                      ? const BoxDecoration(color: AppColor.transparent)
+                      : BoxDecoration(
+                          color: AppColor.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColor.orange.withValues(alpha: 0.8), width: 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColor.black.withValues(alpha: 0.35),
+                              blurRadius: 12,
+                              spreadRadius: 2,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(giftList[0].giftType == 3 ? 0 : 14),
+                    child: PreviewGiftWidget(
+                      url: giftList[0].giftUrl,
+                      type: giftList[0].giftType,
+                      fit: BoxFit.cover,
+                      whenCompleteSVGA: () => onCompleteGiftShow(),
+                    ),
+                  ),
                 ),
               ),
             )
@@ -101,23 +123,23 @@ class ShowReceivedGift {
               right: senderDetailsPosition.value,
               curve: Curves.easeInOut,
               child: Container(
-                height: 55,
-                margin: EdgeInsets.only(top: Get.height / 3),
-                padding: EdgeInsets.all(3),
-                width: giftList[0].receiverName.trim().isEmpty ? Get.width / 2 : 230,
+                height: 48,
+                margin: EdgeInsets.only(top: Get.height * 0.46),
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+                width: giftList[0].receiverName.trim().isEmpty ? Get.width / 2.2 : 230,
                 decoration: BoxDecoration(
                   color: AppColor.lighterYellow,
                   boxShadow: [
                     BoxShadow(
                       color: AppColor.lightYellow.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      spreadRadius: 10,
+                      blurRadius: 8,
+                      spreadRadius: 4,
                     ),
                   ],
                   border: Border(
-                    top: BorderSide(color: AppColor.orange.withValues(alpha: 0.5), width: 3),
-                    left: BorderSide(color: AppColor.orange.withValues(alpha: 0.5), width: 3),
-                    bottom: BorderSide(color: AppColor.orange.withValues(alpha: 0.5), width: 3),
+                    top: BorderSide(color: AppColor.orange.withValues(alpha: 0.6), width: 2),
+                    left: BorderSide(color: AppColor.orange.withValues(alpha: 0.6), width: 2),
+                    bottom: BorderSide(color: AppColor.orange.withValues(alpha: 0.6), width: 2),
                   ),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(100),
@@ -128,16 +150,16 @@ class ShowReceivedGift {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Container(
-                      height: 45,
-                      width: 45,
+                      height: 38,
+                      width: 38,
                       padding: EdgeInsets.all(1),
                       decoration: BoxDecoration(
                         border: Border.all(color: AppColor.white),
                         shape: BoxShape.circle,
                       ),
                       child: Container(
-                        height: 45,
-                        width: 45,
+                        height: 38,
+                        width: 38,
                         clipBehavior: Clip.antiAlias,
                         decoration: BoxDecoration(
                           gradient: AppColor.lightYellowOrangeGradient,
@@ -159,7 +181,7 @@ class ShowReceivedGift {
                             giftList[0].senderName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: AppFontStyle.styleW700(AppColor.orange, 14),
+                            style: AppFontStyle.styleW700(AppColor.orange, 13),
                           ),
                           Flexible(
                             fit: FlexFit.loose,
@@ -177,7 +199,7 @@ class ShowReceivedGift {
                     Text(
                       "X${giftList[0].giftCount}",
                       style: TextStyle(
-                        fontSize: 30,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         fontFamily: AppConstant.appFontExtraBold,
                         fontStyle: FontStyle.italic,
@@ -189,8 +211,8 @@ class ShowReceivedGift {
                           ).createShader(const Rect.fromLTWH(10, 0, 0, 10)),
                         shadows: [
                           const Shadow(
-                            offset: Offset(3, 3),
-                            blurRadius: 3,
+                            offset: Offset(2, 2),
+                            blurRadius: 2,
                             color: Colors.black,
                           ),
                           const Shadow(
@@ -201,7 +223,7 @@ class ShowReceivedGift {
                         ],
                       ),
                     ),
-                    10.width,
+                    8.width,
                   ],
                 ),
               ),

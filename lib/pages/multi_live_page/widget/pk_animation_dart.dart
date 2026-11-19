@@ -134,7 +134,6 @@ class PkTimerWidget extends StatefulWidget {
 
 class _PkTimerWidgetState extends State<PkTimerWidget> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<Offset> _slideAnimation;
 
   @override
   void initState() {
@@ -144,14 +143,6 @@ class _PkTimerWidgetState extends State<PkTimerWidget> with SingleTickerProvider
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -1), // starts from above
-      end: const Offset(0, 0), // slides into place
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOutBack,
-    ));
   }
 
   @override

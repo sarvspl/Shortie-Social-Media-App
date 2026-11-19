@@ -4,6 +4,7 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shortie/pages/chat_page/model/fetch_user_chat_model.dart';
+import 'package:shortie/pages/message_page/controller/message_controller.dart';
 import 'package:shortie/pages/multi_live_page/bottom_sheet/invite_user_for_pk_bottom_sheet.dart';
 import 'package:shortie/pages/multi_live_page/bottom_sheet/join_multi_live_bottom_sheet_widget.dart';
 import 'package:shortie/pages/multi_live_page/bottom_sheet/pk_invitation_bottom_sheet.dart';
@@ -13,6 +14,7 @@ import 'package:shortie/pages/multi_live_page/controller/multi_live_controller.d
 import 'package:shortie/pages/multi_live_page/model/multi_live_users_model.dart';
 import 'package:shortie/pages/multi_live_page/model/pk_gift_top_user_model.dart';
 import 'package:shortie/pages/multi_live_page/model/update_live_type_model.dart';
+import 'package:shortie/pages/stream_page/controller/stream_controller.dart';
 import 'package:shortie/pages/stream_page/model/live_user_object_model.dart';
 import 'package:shortie/utils/api.dart';
 import 'package:shortie/utils/database.dart';
@@ -24,7 +26,8 @@ import '../pages/multi_live_page/widget/show_received_gift.dart';
 io.Socket? socket;
 
 class SocketServices {
-  io.Socket? getSocket() => socket;
+  static io.Socket? getSocket() => socket;
+  static bool get isSocketConnected => socket != null && socket!.connected;
 
   // This is use to When the live user exits the streaming page, the viewing user exits automatically...
   static bool isLiveRunning = false;
@@ -45,41 +48,58 @@ class SocketServices {
   static List<Chat> userChats = [];
   static RxBool onChangeChats = false.obs; // This variable is used for Update only (true/false not matter)
   static String? lastVisitChatUserId;
+  static RxBool isReceiverTyping = false.obs;
+  static DateTime? lastTypingReceivedAt;
 
   static bool isBusyUser = false;
   static String? busyWithUserId;
 
   static int pkDuration = 0;
+  static String? _connectedUserId;
 
   static Future<void> socketConnect() async {
-    // ✅ Guard: already connected — nothing to do
-    if (socket != null && socket!.connected) {
-      Utils.showLog("Socket already connected, skipping reconnect.");
+    final currentUserId = Database.loginUserId.trim();
+
+    // If already connected for this exact user, nothing to do
+    if (socket != null && socket!.connected && _connectedUserId == currentUserId && currentUserId.isNotEmpty) {
+      Utils.showLog("Socket already connected for user $currentUserId, skipping reconnect.");
       return;
     }
 
-    // ✅ Clean slate: tear down any stale socket before creating a new one.
-    // This removes ALL listeners registered on it, preventing duplication.
+    // Clean slate: tear down any stale socket before creating a new one
     disposeSocket();
 
+    if (currentUserId.isEmpty) {
+      Utils.showLog("socketConnect: Database.loginUserId is empty, delaying socket connection.");
+      return;
+    }
+
     try {
+      final uri = Uri.parse(Api.baseUrl);
+      final socketUrl = uri.origin;
+
+      Utils.showLog("Connecting socket to $socketUrl for user $currentUserId...");
       socket = io.io(
-        Api.baseUrl,
-        io.OptionBuilder().setTransports(['websocket']).setQuery({"globalRoom": "globalRoom:${Database.loginUserId}"}).build(),
+        socketUrl,
+        io.OptionBuilder()
+            .setTransports(['websocket', 'polling'])
+            .setPath('/socket.io/')
+            .setQuery({"globalRoom": "globalRoom:$currentUserId"})
+            .enableAutoConnect()
+            .enableReconnection()
+            .build(),
       );
 
       socket!.connect();
       userWatchCount.value = 0;
 
       socket!.onConnect((data) {
-        Utils.showLog("Socket Listen => Socket Connected : ${socket?.id}");
+        _connectedUserId = Database.loginUserId.trim();
+        Utils.showLog("Socket Listen => Socket Connected : ${socket?.id} for user: $_connectedUserId");
         onConnect();
       });
 
-      socket!.once(
-        "connect",
-        (data) {
-          // >>>>> >>>>> >>>>> >>>>> Socket Listen Method <<<<< <<<<< <<<<< <<<<<
+      // >>>>> >>>>> >>>>> >>>>> Socket Listen Method <<<<< <<<<< <<<<< <<<<<
 
           // ************************************************************************************************************************************************************************************************************************
 
@@ -89,7 +109,7 @@ class SocketServices {
 
           socket?.on("endLive", (endLive) {
             userWatchCount.value = 0;
-            Utils.showLog("SOCKET LIVE EVENT => Socket Listen => endLive : $data");
+            Utils.showLog("SOCKET LIVE EVENT => Socket Listen => endLive : $endLive");
 
             if (isLiveRunning) {
               isLiveRunning = false;
@@ -120,7 +140,8 @@ class SocketServices {
             final Map response = await jsonDecode(data);
 
             if (response["giftUrl"] != null && response["giftUrl"] != "" || response["svgaGiftUrl"] != null && response["svgaGiftUrl"] != "") {
-              if (response["userId"] != Database.loginUserId && response["receiversDisplay"] != Database.fetchLoginUserProfileModel!.user!.userName) {
+              final currentUserName = Database.fetchLoginUserProfileModel?.user?.userName ?? "";
+              if (response["userId"] != Database.loginUserId && response["receiversDisplay"] != currentUserName) {
                 response["commentText"] = "${response["userName"]} sent ${response["receiversDisplay"]} ${response['coin']} coins";
               } else if (response["userId"] == Database.loginUserId) {
                 response["commentText"] = "You sent ${response['coin']} coins to ${response["receiversDisplay"]} ";
@@ -136,60 +157,62 @@ class SocketServices {
 
           // ************************************************************************************************************************************************************************************************************************
 
-          socket!.on("messageRequest", (messageRequest) {
-            Utils.showLog("Socket Listen => Get New Message Request : ${messageRequest}");
+          void handleIncomingMessage(dynamic message) {
+            try {
+              Utils.showLog("Socket Listen => Incoming Chat Message: $message");
+              if (message is List && message.isNotEmpty) {
+                message = message[0];
+              }
+              Map response;
+              if (message is Map) {
+                if (message["data"] is String) {
+                  response = jsonDecode(message["data"]);
+                } else if (message["data"] is Map) {
+                  response = Map<String, dynamic>.from(message["data"]);
+                } else {
+                  response = Map<String, dynamic>.from(message);
+                }
+              } else if (message is String) {
+                response = jsonDecode(message);
+              } else {
+                Utils.showLog("Unknown socket message payload type: ${message.runtimeType}");
+                return;
+              }
 
-            if (messageRequest["messageId"] != null) {
-              Utils.showLog("Socket Listen => Get New Message Id : ${messageRequest["messageId"]}");
+              final String? messageId = message is Map
+                  ? (message["messageId"]?.toString() ?? response["messageId"]?.toString() ?? response["_id"]?.toString())
+                  : response["_id"]?.toString();
+
+              if (messageId != null && response["senderUserId"] != null) {
+                onReadMessage(senderUserId: response["senderUserId"].toString(), messageId: messageId);
+              }
+
+              // ✅ Optimistically update and refresh the message inbox list when any message arrives
+              if (Get.isRegistered<MessageController>()) {
+                final senderId = response["senderUserId"]?.toString() ?? "";
+                final msgText = response["message"]?.toString() ?? "";
+                final topicId = response["chatTopicId"]?.toString();
+                final msgController = Get.find<MessageController>();
+                msgController.onIncomingSocketMessage(
+                  senderUserId: senderId,
+                  messageText: msgText,
+                  chatTopicId: topicId,
+                );
+                Future.delayed(const Duration(milliseconds: 1500), () {
+                  if (Get.isRegistered<MessageController>()) {
+                    Get.find<MessageController>().onSocketRefreshMessageUsers();
+                  }
+                });
+              }
+
+              onGetNewMessage(message: response, messageId: messageId);
+            } catch (e) {
+              Utils.showLog("Error processing socket message event: $e");
             }
+          }
 
-            final Map response = jsonDecode(messageRequest["data"]);
-
-            // If User Send Message(Text) Then Get Message Id In Outside Of message["data"] else Send Image/Audio Then Get Message Id In message["data"]
-
-            // if ((response["messageType"] == 2 || response["messageType"] == 3) && response["messageId"] != null) {
-            //   onReadMessage(senderUserId: response["senderUserId"], messageId: response["messageId"]);
-            // } else if (messageRequest["messageId"] != null) {
-            //   onReadMessage(senderUserId: response["senderUserId"], messageId: messageRequest["messageId"]);
-            // }
-
-            onGetNewMessage(message: response, messageId: messageRequest["messageId"]?.toString());
-          });
-
-          socket!.on("message", (message) {
-            Utils.showLog("Socket Listen => Get New Message : ${message}");
-
-            if (message["messageId"] != null) {
-              Utils.showLog("Socket Listen => Get New Message Id : ${message["messageId"]}");
-            }
-
-            final Map response = jsonDecode(message["data"]);
-
-            // If User Send Message(Text) Then Get Message Id In Outside Of message["data"] else Send Image/Audio Then Get Message Id In message["data"]
-
-            if ((response["messageType"] == 2 || response["messageType"] == 3) && response["messageId"] != null) {
-              onReadMessage(senderUserId: response["senderUserId"], messageId: response["messageId"]);
-            } else if (message["messageId"] != null) {
-              onReadMessage(senderUserId: response["senderUserId"], messageId: message["messageId"]);
-            }
-
-            onGetNewMessage(message: response, messageId: message["messageId"]?.toString());
-            // try {
-            //   final bottomBarController = Get.find<BottomBarController>();
-            //   if (bottomBarController.selectedTabIndex == 3) {
-            //     // Call Only User Current On Message Page..
-            //     if (Get.isRegistered<MessageController>()) {
-            //       final messageController = Get.find<MessageController>();
-            //       messageController.init();
-            //     } else {
-            //       final messageController = Get.put(MessageController());
-            //       messageController.init();
-            //     }
-            //   }
-            // } catch (e) {
-            //   Utils.showLog("Get New Message Listen Error => $e");
-            // }
-          });
+          socket!.on("message", handleIncomingMessage);
+          socket!.on("messageRequest", handleIncomingMessage);
 
           socket!.on(
             "messageRead",
@@ -197,8 +220,30 @@ class SocketServices {
               Utils.showLog("Socket Listen => New Message Read : $messageRead");
             },
           );
-        },
-      );
+
+          socket?.on("typing", (data) {
+            try {
+              final Map mapData = data is String ? jsonDecode(data) : data;
+              final String? senderId = mapData["senderUserId"]?.toString();
+              final bool isTyping = mapData["isTyping"] == true || mapData["isTyping"].toString() == "true";
+
+              if (lastVisitChatUserId != null && lastVisitChatUserId == senderId) {
+                isReceiverTyping.value = isTyping;
+                lastTypingReceivedAt = DateTime.now();
+                if (isTyping) {
+                  onScrollDown();
+                  Future.delayed(const Duration(seconds: 4), () {
+                    if (lastTypingReceivedAt != null &&
+                        DateTime.now().difference(lastTypingReceivedAt!).inSeconds >= 3) {
+                      isReceiverTyping.value = false;
+                    }
+                  });
+                }
+              }
+            } catch (e) {
+              Utils.showLog("Typing event decode error: $e");
+            }
+      });
       // >>>>> >>>>> >>>>> MULTI LIVE VIDEO CALL <<<<< <<<<< <<<<<
 
       socket?.on("getLiveHostInfo", (data) async {
@@ -206,8 +251,18 @@ class SocketServices {
         onLiveUserInfoResponse(data);
       });
 
+      socket!.on("liveUserStarted", (data) async {
+        Utils.showLog("Socket Listen => liveUserStarted : $data");
+        if (Get.isRegistered<StreamController>()) {
+          Get.find<StreamController>().init();
+        }
+      });
+
       socket!.on("liveUserLeft", (data) async {
         Utils.showLog("Socket Listen => liveUserLeft : $data");
+        if (Get.isRegistered<StreamController>()) {
+          Get.find<StreamController>().init();
+        }
         onLiveUserLeft(data);
       });
 
@@ -393,10 +448,19 @@ class SocketServices {
       Utils.showLog("Socket dispose error: $e");
     }
     socket = null;
+    _connectedUserId = null;
   }
 
   // >>>>> >>>>> >>>>> >>>>> Socket Emit Method <<<<< <<<<< <<<<< <<<<<
   static Future<void> onConnect() async {
+    final uid = Database.loginUserId.trim();
+    if (uid.isNotEmpty) {
+      _connectedUserId = uid;
+      Utils.showLog("Socket onConnect: explicitly joining room globalRoom:$uid");
+      socket?.emit("joinGlobalRoom", "globalRoom:$uid");
+      socket?.emit("liveRoomConnect", {"userId": uid});
+    }
+
     if (isMultiLiveScreen) {
       final controller = Get.find<MultiLiveController>();
 
@@ -511,21 +575,40 @@ class SocketServices {
       (u) => u.isRequested == true && u.isAccepted == false && u.isSendRequestByHost == true,
     );
 
-    if (targetUser != null) {
-      if (!controller.isHost && (targetUser.agoraUid?.contains(Database.loginUserId) ?? false) && !controller.isAcceptDeclineSheetOpen) {
-        // ← sheet guard
+    // Case 1: Host invited this viewer
+    if (targetUser != null && !controller.isHost && (targetUser.agoraUid?.contains(Database.loginUserId) ?? false) && !controller.isAcceptDeclineSheetOpen) {
+      controller.isAcceptDeclineSheetOpen = true;
 
+      AcceptDeclineBottomSheet.show(
+        userImage: targetUser.image ?? "",
+        userName: targetUser.userName ?? "",
+        userModel: targetUser,
+      ).then((_) {
+        controller.isAcceptDeclineSheetOpen = false;
+      });
+
+      controller.update(["onUpdateMultiLive", "onSwitchCamera", "onSwitchMic", "onCameraOnOff", "onChangeRedDot"]);
+    }
+    // Case 2: Viewer requested to join host's live stream -> Show popup to Host for permission
+    else if (controller.isHost && !controller.isAcceptDeclineSheetOpen) {
+      final viewerRequest = multiLiveUsers.firstWhereOrNull(
+        (u) => u.isRequested == true && u.isAccepted == false && u.isSendRequestByHost != true,
+      );
+
+      if (viewerRequest != null) {
         controller.isAcceptDeclineSheetOpen = true;
 
         AcceptDeclineBottomSheet.show(
-          userImage: targetUser.image ?? "",
-          userName: targetUser.userName ?? "",
-          userModel: targetUser,
+          userImage: viewerRequest.image ?? "",
+          userName: viewerRequest.name?.isNotEmpty == true ? viewerRequest.name! : (viewerRequest.userName ?? "Viewer"),
+          userModel: viewerRequest,
         ).then((_) {
           controller.isAcceptDeclineSheetOpen = false;
         });
 
         controller.update(["onUpdateMultiLive", "onSwitchCamera", "onSwitchMic", "onCameraOnOff", "onChangeRedDot"]);
+      } else {
+        controller.onUpdateMultiLive(multiLiveUsers);
       }
     } else {
       controller.onUpdateMultiLive(multiLiveUsers);
@@ -690,29 +773,7 @@ class SocketServices {
   static void onListenPkEndedByDisconnect(dynamic data) {
     if (Get.isRegistered<MultiLiveController>()) {
       final controller = Get.find<MultiLiveController>();
-
-      if (controller.isHost) {
-        Utils.showToast("PK ended due to disconnect");
-      }
-
-      controller.liveUserObject?.isPkMode = false;
-      controller.host2ChannelId = "";
-
-      controller.host1Rank = 0;
-      controller.host2Rank = 0;
-      controller.host1WinnerPoint = 0;
-      controller.host2WinnerPoint = 0;
-
-      controller.pkTimer?.cancel();
-      controller.pkSuperTimer?.cancel();
-      controller.host1TopGiftUsers.clear();
-      controller.host2TopGiftUsers.clear();
-
-      controller.update(["onUpdateMultiLive", "onUpdateRank", "onChangePkTime"]);
-
-      if (controller.isHost) {
-        SocketServices().onEmitUpdateLiveTypeStatus(liveHistoryId: controller.host1RoomId, liveUserObjId: controller.liveUserObjId, liveType: 1);
-      }
+      controller.handleOpponentDisconnected();
     }
   }
 
@@ -908,6 +969,17 @@ class SocketServices {
     }
   }
 
+  static void onEmitTyping({required String receiverUserId, required bool isTyping}) {
+    if (socket != null && socket!.connected) {
+      final data = jsonEncode({
+        "senderUserId": Database.loginUserId,
+        "receiverUserId": receiverUserId,
+        "isTyping": isTyping,
+      });
+      socket!.emit("typing", data);
+    }
+  }
+
   static Future<void> onReadMessage({
     required String senderUserId,
     required String messageId,
@@ -973,31 +1045,48 @@ class SocketServices {
 
   static Future<void> onGetNewMessage({required Map message, String? messageId}) async {
     try {
-      final String? finalMessageId = messageId ?? message["messageId"] ?? message["_id"] ?? message["id"];
+      final String? finalMessageId = messageId ?? message["messageId"]?.toString() ?? message["_id"]?.toString() ?? message["id"]?.toString();
+      final String senderId = (message["senderUserId"] ?? "").toString().trim();
+      final String receiverId = (message["receiverUserId"] ?? "").toString().trim();
+      final String myId = Database.loginUserId.trim();
+      final String activeChatId = (lastVisitChatUserId ?? "").trim();
 
-      // Check against recent messages to prevent duplicates from multi-socket triggers
+      // Only append if message is for the active conversation
+      if (activeChatId.isNotEmpty) {
+        bool isCurrentChat = (receiverId.isNotEmpty)
+            ? ((senderId == activeChatId && receiverId == myId) || (senderId == myId && receiverId == activeChatId))
+            : (senderId == activeChatId || senderId == myId);
+
+        if (!isCurrentChat) {
+          Utils.showLog("Message received for a different user ($senderId), skipping append to active chat.");
+          return;
+        }
+      }
+
+      // Check against recent messages to prevent duplicates
       if (userChats.isNotEmpty) {
-        // Look at the last 10 messages for any match
         final recentChats = userChats.reversed.take(10).toList();
-        
-        bool isDuplicate = recentChats.any((chat) {
-          // 1. Match by ID if both have a valid ID
+
+        bool isDuplicate = false;
+        for (var chat in recentChats) {
           if (finalMessageId != null && finalMessageId.isNotEmpty && chat.id != null && chat.id!.isNotEmpty) {
-            if (chat.id == finalMessageId) return true;
+            if (chat.id == finalMessageId) {
+              isDuplicate = true;
+              break;
+            }
           }
-          
-          // 2. Strict Content match fallback (useful if ID was somehow stripped or null)
-          bool sameContent = chat.message == message["message"] &&
-                             chat.image == message["image"] &&
-                             chat.audio == message["audio"] &&
-                             chat.senderUserId == message["senderUserId"] &&
-                             chat.createdAt == message["createdAt"];
-                             
-          return sameContent;
-        });
+          if (chat.senderUserId == senderId &&
+              chat.message == message["message"] &&
+              chat.messageType == message["messageType"] &&
+              (chat.id?.startsWith("temp_") == true)) {
+            chat.id = finalMessageId;
+            isDuplicate = true;
+            break;
+          }
+        }
 
         if (isDuplicate) {
-          Utils.showLog("Duplicate chat message found, ignoring... ID: $finalMessageId");
+          Utils.showLog("Duplicate or optimistic chat message found, skipping duplicate append... ID: $finalMessageId");
           return;
         }
       }
@@ -1008,7 +1097,8 @@ class SocketServices {
           image: message["image"],
           audio: message["audio"],
           message: message["message"],
-          createdAt: message["createdAt"],
+          createdAt: message["createdAt"] ?? DateTime.now().toIso8601String(),
+          date: message["date"]?.toString() ?? message["createdAt"]?.toString() ?? DateTime.now().toIso8601String(),
           messageType: message["messageType"],
           senderUserId: message["senderUserId"],
           isChatMediaBanned: message["isChatMediaBanned"],
@@ -1016,7 +1106,6 @@ class SocketServices {
       );
 
       onUpdateChat();
-
       await onScrollDown();
     } catch (e) {
       Utils.showLog("New Message Get Filed => $e");
@@ -1234,6 +1323,9 @@ class SocketServices {
     required bool isCameraEnabled,
     required bool isMute,
     required int position,
+    String? name,
+    String? userName,
+    String? image,
   }) async {
     final data = jsonEncode({
       "userId": userId,
@@ -1243,6 +1335,9 @@ class SocketServices {
       "isCameraEnabled": isCameraEnabled,
       "position": position,
       "isMute": isMute,
+      "name": name ?? Database.fetchLoginUserProfileModel?.user?.name ?? "",
+      "userName": userName ?? Database.fetchLoginUserProfileModel?.user?.userName ?? "",
+      "image": image ?? Database.fetchLoginUserProfileModel?.user?.image ?? "",
     });
 
     if (socket?.connected == true) {
@@ -1435,26 +1530,39 @@ class SocketServices {
 
     try {
       final Map jsonResponseData = jsonDecode(data["data"]);
-      pkDuration = data["response"]["duration"] ?? 0;
+      pkDuration = data["response"]?["duration"] ?? 0;
 
       if (PkResultBottomSheetUi.isOpenBottomSheet) Get.back();
 
+      // ALWAYS close SendingPkRequestBottomSheet immediately upon receiving response!
+      if (SendingPkRequestBottomSheet.isOpenBottomSheet) {
+        SendingPkRequestBottomSheet.isOpenBottomSheet = false;
+        Get.back();
+      }
+
       final bool isAccept = bool.parse(jsonResponseData["isAccept"].toString());
-      if (SendingPkRequestBottomSheet.isOpenBottomSheet) Get.back();
 
       if (isAccept) {
-        if (controller.host1RoomId == jsonResponseData["HOST_2_LIVEID"]) {
+        // Resolve opponent's info whether current user is Host 1 or Host 2
+        if (controller.host1Id == jsonResponseData["HOST_2_ID"] || controller.host1RoomId == jsonResponseData["HOST_2_LIVEID"]) {
           controller.host2Id = jsonResponseData["HOST_1_ID"] ?? "";
           controller.host2Name = jsonResponseData["HOST_1_NAME"] ?? "";
           controller.host2Image = jsonResponseData["HOST_1_IMAGE"] ?? "";
           controller.host2ChannelId = jsonResponseData["HOST_1_CHANNEL"] ?? "";
+        } else {
+          controller.host2Id = jsonResponseData["HOST_2_ID"] ?? "";
+          controller.host2Name = jsonResponseData["HOST_2_NAME"] ?? "";
+          controller.host2Image = jsonResponseData["HOST_2_IMAGE"] ?? "";
+          controller.host2ChannelId = jsonResponseData["HOST_2_CHANNEL"] ?? "";
         }
         controller.onStartRelay();
         controller.onChangePkTime(
-          isPkRequestUser: controller.host1RoomId == jsonResponseData["HOST_2_LIVEID"],
-          time: pkDuration,
+          isPkRequestUser: true,
+          time: pkDuration > 0 ? pkDuration : 120,
         );
       }
+    } catch (e) {
+      Utils.showLog("onListenPkAnswer Error => $e");
     } finally {
       await Future.delayed(const Duration(seconds: 2));
       controller.isPkAnswerProcessing = false;
@@ -1532,11 +1640,14 @@ class SocketServices {
       "liveUserId": liveUserId,
     });
 
+    if (socket == null || !socket!.connected) {
+      await socketConnect();
+    }
     if (socket != null && socket!.connected) {
       socket?.emit("getLiveHostInfo", data);
       Utils.showLog("SOCKET LIVE EVENT => Socket Emit => getLiveHostInfo => $data");
     } else {
-      Utils.showLog("Socket Not Connected !!");
+      Utils.showLog("Socket Not Connected after retry!!");
     }
   }
 

@@ -46,8 +46,11 @@ class AcceptDeclineBottomSheet {
             const SizedBox(height: 10),
             CircleAvatar(
               radius: 35,
-              backgroundImage: NetworkImage(Api.baseUrl + userImage),
+              backgroundImage: userImage.isNotEmpty
+                  ? NetworkImage(userImage.startsWith("http") ? userImage : (Api.baseUrl + userImage))
+                  : null,
               backgroundColor: Colors.grey[200],
+              child: userImage.isEmpty ? const Icon(Icons.person, size: 35, color: Colors.grey) : null,
             ),
             const SizedBox(height: 8),
             Text(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get/get_rx/src/rx_typedefs/rx_typedefs.dart';
 import 'package:shortie/main.dart';
+import 'package:shortie/pages/multi_live_page/bottom_sheet/Invite_user_for_multi_live.dart';
 import 'package:shortie/pages/multi_live_page/controller/multi_live_controller.dart';
 import 'package:shortie/ui/circle_icon_button_ui.dart';
 import 'package:shortie/ui/preview_network_image_ui.dart';
@@ -43,7 +44,32 @@ class IncomingMultiLiveRequestBottomSheetWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  SizedBox(width: 120),
+                  GestureDetector(
+                    onTap: () {
+                      Get.back();
+                      InviteUserForMultiLiveBottomSheet.show(
+                        context: Get.context!,
+                        postion: controller.joinMultiLiveUsers.length,
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(left: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(6),
+                        color: AppColor.grey_100,
+                        border: Border.all(color: AppColor.primary, width: 1.2),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_add_alt_1, size: 16, color: AppColor.primary),
+                          4.width,
+                          Text("Invite", style: AppFontStyle.styleW700(AppColor.primary, 13)),
+                        ],
+                      ),
+                    ),
+                  ),
                   Spacer(),
                   Container(
                     height: 4,
@@ -144,7 +170,7 @@ class IncomingMultiLiveRequestBottomSheetWidget {
                                             isMute: indexData.isMute ?? false,
                                           );
                                         } else {
-                                          if (controller.multiLiveRequestedList.length == (controller.maxGuestSlots)) {
+                                          if (controller.joinMultiLiveUsers.length < controller.maxGuestSlots) {
                                             SocketServices().onEmitAddParticipantToCallJoin(
                                               userId: indexData.userId ?? "",
                                               liveHistoryId: controller.roomID,
@@ -155,7 +181,7 @@ class IncomingMultiLiveRequestBottomSheetWidget {
                                               isMute: indexData.isMute ?? false,
                                             );
                                           } else {
-                                            Utils.showToast("Maximum 4 user join multi live");
+                                            Utils.showToast("Maximum guest slots reached");
                                           }
                                         }
                                       }

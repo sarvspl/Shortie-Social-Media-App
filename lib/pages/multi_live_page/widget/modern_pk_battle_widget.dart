@@ -5,6 +5,8 @@ import 'package:shortie/main.dart';
 import 'package:shortie/pages/fake_live_page/widget/fake_send_gift_bottom_sheet_widget.dart';
 import 'package:shortie/pages/multi_live_page/controller/multi_live_controller.dart';
 import 'package:shortie/pages/multi_live_page/model/pk_gift_top_user_model.dart';
+import 'package:shortie/pages/splash_screen_page/api/fetch_gift_api.dart';
+import 'package:shortie/pages/splash_screen_page/model/fetch_gift_model.dart';
 import 'package:shortie/ui/preview_network_image_ui.dart';
 import 'package:shortie/utils/asset.dart';
 import 'package:shortie/utils/color.dart';
@@ -244,24 +246,57 @@ class ModernPkScoreBarWidget extends StatelessWidget {
   }
 }
 
-/// Horizontal Quick Gifts Row above bottom controls (as seen in image 1)
-class ModernQuickGiftBarWidget extends StatelessWidget {
+/// Horizontal Quick Gifts Row above bottom controls (dynamically loaded from backend)
+class ModernQuickGiftBarWidget extends StatefulWidget {
   const ModernQuickGiftBarWidget({super.key, required this.onSendGift});
 
-  final Function(int coins, String giftName) onSendGift;
+  final Function(Data gift) onSendGift;
 
-  static const List<Map<String, dynamic>> _quickGifts = [
-    {"name": "Sports Car", "coins": 50000, "label": "50 K", "icon": "🏎️"},
-    {"name": "Dragon", "coins": 40000, "label": "40 K", "icon": "🐉"},
-    {"name": "Rocket", "coins": 25000, "label": "25 K", "icon": "🚀"},
-    {"name": "Super Ring", "coins": 5000, "label": "5 K", "icon": "💍"},
-    {"name": "Crown", "coins": 25000, "label": "25 K", "icon": "👑"},
-    {"name": "Hawk", "coins": 30000, "label": "30 K", "icon": "🦅"},
-    {"name": "Castle", "coins": 100000, "label": "100 K", "icon": "🏰"},
-  ];
+  @override
+  State<ModernQuickGiftBarWidget> createState() => _ModernQuickGiftBarWidgetState();
+}
+
+class _ModernQuickGiftBarWidgetState extends State<ModernQuickGiftBarWidget> {
+  static List<Data>? _cachedGifts;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_cachedGifts == null || _cachedGifts!.isEmpty) {
+      _loadGifts();
+    }
+  }
+
+  Future<void> _loadGifts() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+    try {
+      final model = await FetchGiftApi.callApi();
+      if (model?.data != null && model!.data!.isNotEmpty) {
+        _cachedGifts = model.data;
+      }
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _formatCoins(int coins) {
+    if (coins >= 1000) {
+      final k = coins / 1000;
+      return "${k.toStringAsFixed(coins % 1000 == 0 ? 0 : 1)} K";
+    }
+    return "$coins";
+  }
 
   @override
   Widget build(BuildContext context) {
+    final gifts = _cachedGifts ?? [];
+    if (gifts.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
       height: 64,
       width: Get.width,
@@ -270,11 +305,14 @@ class ModernQuickGiftBarWidget extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        itemCount: _quickGifts.length,
+        itemCount: gifts.length,
         itemBuilder: (context, index) {
-          final item = _quickGifts[index];
+          final item = gifts[index];
+          final coins = item.coin ?? 0;
+          final image = item.image ?? "";
+
           return GestureDetector(
-            onTap: () => onSendGift(item["coins"] as int, item["name"] as String),
+            onTap: () => widget.onSendGift(item),
             child: Container(
               width: 58,
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -287,7 +325,13 @@ class ModernQuickGiftBarWidget extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(item["icon"] as String, style: const TextStyle(fontSize: 22)),
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: image.isNotEmpty
+                        ? PreviewNetworkImageUi(image: image)
+                        : Image.asset(AppAsset.icGift),
+                  ),
                   const SizedBox(height: 2),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -295,7 +339,7 @@ class ModernQuickGiftBarWidget extends StatelessWidget {
                       Image.asset(AppAsset.icCoin, width: 11, height: 11),
                       const SizedBox(width: 2),
                       Text(
-                        item["label"] as String,
+                        _formatCoins(coins),
                         style: AppFontStyle.styleW700(Colors.amberAccent, 10),
                       ),
                     ],

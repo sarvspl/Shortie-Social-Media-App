@@ -16,11 +16,11 @@ import 'package:shortie/utils/font_style.dart';
 import 'package:zego_express_engine/zego_express_engine.dart';
 
 class HostVideoView extends StatefulWidget {
-  String streamID;
-  Requested? coHost;
-  double height;
-  bool isMute;
-  HostVideoView({super.key, required this.streamID, required this.height, required this.coHost, required this.isMute});
+  final String streamID;
+  final Requested? coHost;
+  final double height;
+  final bool isMute;
+  const HostVideoView({super.key, required this.streamID, required this.height, required this.coHost, required this.isMute});
 
   @override
   State<HostVideoView> createState() => _HostVideoViewState();
@@ -509,11 +509,11 @@ class _HostVideoViewState extends State<HostVideoView> {
 // }
 
 class PkHostVideoView extends StatefulWidget {
-  String streamID;
-  double height;
-  bool isMute;
+  final String streamID;
+  final double height;
+  final bool isMute;
 
-  PkHostVideoView({
+  const PkHostVideoView({
     super.key,
     required this.streamID,
     required this.height,
@@ -581,9 +581,13 @@ class _PkHostVideoViewState extends State<PkHostVideoView> {
               break;
           }
 
-          if (errorCode != 0) {
+          if (errorCode != 0 || (state == ZegoPlayerState.NoPlay && isStreamPlaying)) {
             hasStreamError = true;
             streamError = "Stream error: $errorCode";
+            if (controller.liveUserObject?.isPkMode == true) {
+              log("Opponent stream stopped in PkHostVideoView -> triggering handleOpponentDisconnected");
+              controller.handleOpponentDisconnected();
+            }
           }
         });
       }
@@ -692,15 +696,15 @@ class _PkHostVideoViewState extends State<PkHostVideoView> {
     return GetBuilder<MultiLiveController>(
       id: 'onUpdateMultiLive',
       builder: (controller) {
-        return Container(
+        return SizedBox(
           height: widget.height,
-          width: Get.width * 0.3,
+          width: double.infinity,
           child: Stack(
+            fit: StackFit.expand,
             children: [
-              // _buildOffCameraUserProfile(controller, Get.height * 0.5, Get.width),
-
-              (controller.isLoading.value == false && remoteView != null) ? remoteView! : LoadingUi(color: AppColor.white),
-              // isRemoteViewAvailable() ? remoteView! : _buildOffCameraUserProfile(controller, Get.height * 0.5, Get.width),
+              (controller.isLoading.value == false && remoteView != null)
+                  ? SizedBox.expand(child: remoteView!)
+                  : LoadingUi(color: AppColor.white),
             ],
           ),
         );

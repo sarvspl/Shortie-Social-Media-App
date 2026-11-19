@@ -33,6 +33,9 @@ class PkResultBottomSheetUi {
   }) async {
     isOpenBottomSheet = true;
 
+    final controller = Get.isRegistered<MultiLiveController>() ? Get.find<MultiLiveController>() : null;
+    final bool isHost = controller?.isHost ?? false;
+
     String title;
     String subtitle;
     String emojiAsset;
@@ -41,20 +44,20 @@ class PkResultBottomSheetUi {
     switch (result) {
       case PKResult.win:
         title = "Victory!";
-        subtitle = "You Won the PK Battle";
+        subtitle = isHost ? "You Won the PK Battle" : "$h1Name Won the PK Battle";
         emojiAsset = AppAsset.img_pk_win_emoji;
         gradient = AppColor.primaryLinearGradient;
         break;
       case PKResult.lose:
-        title = "Better Luck Next Time";
-        subtitle = "You Lost the PK Battle";
+        title = isHost ? "Better Luck Next Time" : "Battle Ended";
+        subtitle = isHost ? "You Lost the PK Battle" : "$h2Name Won the PK Battle";
         emojiAsset = AppAsset.img_pk_lose_emoji;
         gradient = AppColor.redGradient;
         break;
       case PKResult.tie:
         title = "It's a Draw!";
         subtitle = "Both Hosts Gave Their Best";
-        emojiAsset = AppAsset.img_pk_tie_emoji; // Add this asset
+        emojiAsset = AppAsset.img_pk_tie_emoji;
         gradient = AppColor.greyGradient;
         break;
     }
@@ -62,52 +65,55 @@ class PkResultBottomSheetUi {
     await showModalBottomSheet(
       isScrollControlled: true,
       context: Get.context!,
-      backgroundColor: AppColor.white,
+      backgroundColor: AppColor.transparent,
       builder: (context) => Container(
-        height: 275,
         width: Get.width,
         clipBehavior: Clip.antiAlias,
         decoration: const BoxDecoration(
-          color: AppColor.transparent,
+          color: AppColor.white,
           borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(15),
-            topRight: Radius.circular(15),
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
         ),
-        child: Column(
-          children: [
-            Container(
-              decoration: BoxDecoration(gradient: gradient),
-              child: Padding(
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(gradient: gradient),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  child: _buildResultHeader(
+                    title,
+                    subtitle,
+                    emojiAsset,
+                    totalPkRounds,
+                    result,
+                  ),
+                ),
+              ),
+              result == PKResult.tie ? 15.height : 10.height,
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 15),
-                child: _buildResultHeader(
-                  title,
-                  subtitle,
-                  emojiAsset,
-                  totalPkRounds,
+                child: _buildStatsSection(
+                  h1Name,
+                  h1Image,
+                  h2Name,
+                  h2Image,
+                  host1WinnerPoint,
+                  host2WinnerPoint,
+                  h1RankTotal,
+                  h2RankTotal,
                   result,
                 ),
               ),
-            ),
-            result == PKResult.tie ? 20.height : 0.height,
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              child: _buildStatsSection(
-                h1Name,
-                h1Image,
-                h2Name,
-                h2Image,
-                host1WinnerPoint,
-                host2WinnerPoint,
-                h1RankTotal,
-                h2RankTotal,
-                result,
-              ),
-            ),
-            20.height,
-            _buildActionButtons(context),
-            15.height,
-          ],
+              15.height,
+              _buildActionButtons(context),
+              15.height,
+            ],
+          ),
         ),
       ),
     ).whenComplete(() => isOpenBottomSheet = false);
@@ -122,28 +128,33 @@ class PkResultBottomSheetUi {
   ) {
     return Row(
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            15.height,
-            Text(title, style: AppFontStyle.styleW600(AppColor.white, 16)),
-            8.height,
-            Text(subtitle, style: AppFontStyle.styleW900(AppColor.white, PKResult.tie == result ? 22 : 25)),
-            5.height,
-            if (totalPkRounds > 0) Text("$totalPkRounds Rounds Completed", style: AppFontStyle.styleW500(AppColor.white, 14)),
-            12.height,
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              15.height,
+              Text(title, style: AppFontStyle.styleW600(AppColor.white, 16)),
+              8.height,
+              Text(
+                subtitle,
+                style: AppFontStyle.styleW900(AppColor.white, PKResult.tie == result ? 19 : 23),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              5.height,
+              if (totalPkRounds > 0) Text("$totalPkRounds Rounds Completed", style: AppFontStyle.styleW500(AppColor.white, 14)),
+              12.height,
+            ],
+          ),
         ),
-        Spacer(),
-        Align(
-          alignment: Alignment.centerRight,
-          child: emojiAsset.isNotEmpty
-              ? Image.asset(
-                  emojiAsset,
-                  width: result == PKResult.tie ? 60 : 100,
-                )
-              : SizedBox.shrink(),
-        ),
+        10.width,
+        if (emojiAsset.isNotEmpty)
+          Image.asset(
+            emojiAsset,
+            width: result == PKResult.tie ? 55 : 85,
+            height: result == PKResult.tie ? 55 : 85,
+            fit: BoxFit.contain,
+          ),
       ],
     );
   }
@@ -182,8 +193,7 @@ class PkResultBottomSheetUi {
     PKResult result,
   ) {
     return Container(
-      height: 70,
-      padding: EdgeInsets.symmetric(horizontal: 10),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -198,9 +208,9 @@ class PkResultBottomSheetUi {
               children: [
                 Row(
                   children: [
-                    Text(h1Name, style: AppFontStyle.styleW600(AppColor.black, 13)),
-                    Spacer(),
-                    Text(h2Name, style: AppFontStyle.styleW600(AppColor.black, 13)),
+                    Expanded(child: Text(h1Name, style: AppFontStyle.styleW600(AppColor.black, 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    10.width,
+                    Expanded(child: Text(h2Name, textAlign: TextAlign.end, style: AppFontStyle.styleW600(AppColor.black, 13), maxLines: 1, overflow: TextOverflow.ellipsis)),
                   ],
                 ),
                 5.height,
@@ -384,7 +394,12 @@ class PkResultBottomSheetUi {
                   color: AppColor.coloGreyText,
                   borderRadius: BorderRadius.circular(30),
                 ),
-                child: Text(EnumLocal.txtEndBattle.name.tr, style: AppFontStyle.styleW700(AppColor.white, 16)),
+                child: GetBuilder<MultiLiveController>(
+                  builder: (controller) => Text(
+                    controller.isHost ? EnumLocal.txtEndBattle.name.tr : "Close",
+                    style: AppFontStyle.styleW700(AppColor.white, 16),
+                  ),
+                ),
               ),
             ),
           ),

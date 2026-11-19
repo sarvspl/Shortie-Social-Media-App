@@ -255,38 +255,88 @@ class MultiLiveController extends GetxController {
     Utils.showLog("MULTI LIVE INIT CALL => UserId => $userId LiveHistoryId => $liveHistoryId LiveUserObjId => $liveUserObjId isHost => $isHost");
 
     this.isHost = isHost;
+    this.liveUserId = userId.isNotEmpty ? userId : Database.loginUserId;
+    this.liveUserObjId = liveUserObjId;
+    this.roomID = liveHistoryId;
     SocketServices.userWatchCount.value = 0;
 
-    SocketServices.emitOnGetLiveHostInfo(liveHistoryId: liveHistoryId, liveUserObjId: liveUserObjId, liveUserId: Database.loginUserId);
-    Utils.showLog("MULTI LIVE INIT CALL => UserId => 001");
+    await Utils.onInitCreateEngine();
 
-    Utils.showLog("MULTI LIVE INIT CALL => UserId => 003");
+    if (isHost) {
+      final user = Database.fetchLoginUserProfileModel?.user;
+      if (user != null) {
+        name = user.name ?? name;
+        userName = user.userName ?? userName;
+        image = user.image ?? image;
+        host1Id = liveUserId;
+        host1Name = name;
+        host1UserName = userName;
+        host1Image = image;
+        host1ChannelId = '${Database.loginUserId}_call';
+        host1RoomId = roomID;
+        host1Token = "abc";
+      }
+      liveUserObject = LiveUserObject(
+        id: liveUserObjId,
+        liveHistoryId: roomID,
+        userId: liveUserId,
+        name: name,
+        userName: userName,
+        image: image,
+        isPkMode: false,
+      );
+      update(["onUpdateMultiLive", "onUpdateRank"]);
+
+      // Start preview, events, and login room immediately for host
+      onStartPreview();
+      onStartListenEvent();
+      onLoginRoom();
+    } else {
+      // Immediately register viewer with socket to sync view count
+      SocketServices.onAddView(loginUserId: Database.loginUserId, liveHistoryId: liveHistoryId);
+    }
+
+    // Safety timeout: ensure loading spinner never hangs indefinitely
+    Future.delayed(const Duration(seconds: 8), () {
+      if (isLoading.value) {
+        isLoading.value = false;
+        update(["onUpdateMultiLive"]);
+      }
+    });
+
+    SocketServices.emitOnGetLiveHostInfo(liveHistoryId: liveHistoryId, liveUserObjId: liveUserObjId, liveUserId: Database.loginUserId);
   }
 
   void onGetLiveObject(dynamic data) async {
     if (data is Map<String, dynamic>) {
-      liveUserObject = null;
-      liveUserObject = LiveUserObject.fromJson(data);
+      final newObj = LiveUserObject.fromJson(data);
+      liveUserObject = newObj;
 
       if (liveUserObject?.userId?.trim().isNotEmpty ?? false) {
         await getArguments(liveUserList: liveUserObject);
 
+        if (liveUserObject?.view != null && liveUserObject!.view! > 0) {
+          SocketServices.userWatchCount.value = liveUserObject!.view!;
+        }
+
         if (liveUserObject?.isPkMode == true) onShowPkAnimation();
 
-        await 1.seconds.delay();
-
-        onStartListenEvent();
-        onLoginRoom();
+        if (!isHost) {
+          await 1.seconds.delay();
+          onStartListenEvent();
+          onLoginRoom();
+        }
         if (liveUserObject?.isPkMode == true && Platform.isIOS) {
           await 2.delay();
           onStartRelay();
         }
         WakelockPlus.enable();
-        // FetchGiftApi.callApi();
       }
     } else {
-      Get.back(); // Close Live Page
-      Utils.showToast(data);
+      if (!isHost) {
+        Get.back(); // Close Live Page only for guests
+        Utils.showToast(data.toString());
+      }
     }
   }
 
@@ -483,12 +533,30 @@ class MultiLiveController extends GetxController {
       update(["onUpdateEmojiPicker", "onUpdateTextField"]);
     }
     if (commentController.text.trim().isNotEmpty) {
+      final commentText = commentController.text.trim();
+      final myId = Database.fetchLoginUserProfileModel?.user?.id ?? Database.loginUserId;
+      final myName = Database.fetchLoginUserProfileModel?.user?.name ?? Database.fetchLoginUserProfileModel?.user?.userName ?? "User";
+      final myImage = Database.fetchLoginUserProfileModel?.user?.image ?? "";
+
+      // Optimistically display the comment locally
+      SocketServices.onGetNewComment(message: {
+        "userName": myName,
+        "userImage": myImage,
+        "commentText": commentText,
+        "userId": myId,
+        "liveHistoryId": roomID,
+        "giftUrl": "",
+        "svgaGiftUrl": "",
+        "receiversDisplay": "",
+        "coin": 0,
+      });
+
       SocketServices.onLiveChat(
-        loginUserId: Database.fetchLoginUserProfileModel?.user?.id ?? "",
+        loginUserId: myId,
         liveHistoryId: roomID,
-        userName: Database.fetchLoginUserProfileModel?.user?.name ?? "",
-        userImage: Database.fetchLoginUserProfileModel?.user?.image ?? "",
-        commentText: commentController.text,
+        userName: myName,
+        userImage: myImage,
+        commentText: commentText,
         giftUrl: "",
         svgaGiftUrl: "",
         isPkActive: liveUserObject?.isPkMode == true,
@@ -788,11 +856,13 @@ class MultiLiveController extends GetxController {
 
   /// >>>>>>>>>>>Send Multi Live(co-Host) Request On Socket<<<<<<<<<<<
   Future<void> onSendMultiLiveRequestOnSocket() async {
+    final effectiveRoomId = roomID.isNotEmpty ? roomID : (liveUserObject?.liveHistoryId ?? "");
+    final effectiveObjId = liveUserObjId.isNotEmpty ? liveUserObjId : (liveUserObject?.id ?? "");
     String liveStreamId = "${Database.loginUserId}_call";
     SocketServices().onEmitCallJoinRequest(
       userId: Database.loginUserId,
-      liveHistoryId: roomID,
-      liveUserObjId: liveUserObjId,
+      liveHistoryId: effectiveRoomId,
+      liveUserObjId: effectiveObjId,
       name: Database.fetchLoginUserProfileModel?.user?.name ?? "",
       userName: Database.fetchLoginUserProfileModel?.user?.userName ?? "",
       image: Database.fetchLoginUserProfileModel?.user?.image ?? "",
@@ -805,6 +875,32 @@ class MultiLiveController extends GetxController {
       position: coHostRequestPosition,
       isSendrequestByHost: false,
     );
+  }
+
+  /// >>>>>>>>>>>Direct Join Multi Live as Co-Host (Ranglive Instant Seat Join)<<<<<<<<<<<
+  Future<void> onDirectJoinAsCoHost() async {
+    final effectiveRoomId = roomID.isNotEmpty ? roomID : (liveUserObject?.liveHistoryId ?? "");
+    final effectiveObjId = liveUserObjId.isNotEmpty ? liveUserObjId : (liveUserObject?.id ?? "");
+    String liveStreamId = "${Database.loginUserId}_call";
+
+    // 1. Emit call join request to sync requested list
+    await onSendMultiLiveRequestOnSocket();
+
+    // 2. Directly add as active co-host participant (instant seat connect)
+    SocketServices().onEmitAddParticipantToCallJoin(
+      userId: Database.loginUserId,
+      liveHistoryId: effectiveRoomId,
+      liveUserObjId: effectiveObjId,
+      agoraUid: liveStreamId,
+      position: coHostRequestPosition,
+      isCameraEnabled: isCameraOn,
+      isMute: isMuteMic,
+      name: Database.fetchLoginUserProfileModel?.user?.name ?? "",
+      userName: Database.fetchLoginUserProfileModel?.user?.userName ?? "",
+      image: Database.fetchLoginUserProfileModel?.user?.image ?? "",
+    );
+
+    Utils.showToast("Connecting as Co-Host...");
   }
 
   /// >>>>>>>>>>>Co-Host request to user join <<<<<<<<<<<
@@ -920,12 +1016,66 @@ class MultiLiveController extends GetxController {
 
           log("PK Battle Ended");
 
-          if (isHost && isPkRequestUser) {
+          if (isHost) {
             onPkEnd(isManualMode: false);
           }
         }
       },
     );
+  }
+
+  void handleOpponentDisconnected() {
+    if (liveUserObject?.isPkMode != true) return;
+    Utils.showLog("Handling PK Opponent Disconnection...");
+
+    Utils.showToast("Opponent disconnected. PK battle ended.");
+
+    // 1. Stop playing opponent stream and clean up Zego
+    if (host2ChannelId.isNotEmpty) {
+      try {
+        ZegoExpressEngine.instance.stopPlayingStream(host2ChannelId);
+      } catch (e) {
+        Utils.showLog("Error stopping remote PK stream: $e");
+      }
+    }
+
+    // 2. Reset PK state
+    liveUserObject?.isPkMode = false;
+    host2ChannelId = "";
+    host2Id = "";
+    host2Name = "";
+    host2Image = "";
+
+    // 3. Reset scores and timers
+    host1Rank = 0;
+    host2Rank = 0;
+    host1WinnerPoint = 0;
+    host2WinnerPoint = 0;
+    pkTimer?.cancel();
+    pkSuperTimer?.cancel();
+    host1TopGiftUsers.clear();
+    host2TopGiftUsers.clear();
+
+    // 4. Restore camera mirror mode and full-screen solo live layout
+    applyMirrorMode();
+
+    // 5. Update UI components
+    update(["onUpdateMultiLive", "onUpdateRank", "onChangePkTime"]);
+
+    // 6. Notify backend socket so database and viewers are synchronized
+    if (isHost) {
+      SocketServices.onPkEnd(
+        userId: host1Id,
+        liveHistoryId: host1RoomId,
+        isPkTimeOut: false,
+        isManualMode: true,
+      );
+      SocketServices().onEmitUpdateLiveTypeStatus(
+        liveHistoryId: host1RoomId,
+        liveUserObjId: liveUserObjId,
+        liveType: 1,
+      );
+    }
   }
 
   void onPkEnd({required bool isManualMode}) {
@@ -1037,7 +1187,10 @@ class MultiLiveController extends GetxController {
         debugPrint('onRoomUserUpdate: roomID: $roomID, updateType: ${updateType.name}, userList: ${userList.map((e) => e.userID)}');
         if (updateType == ZegoUpdateType.Delete) {
           for (var user in userList) {
-            if (user.userID == liveUserId && !isHost) {
+            if (liveUserObject?.isPkMode == true && (user.userID == host2Id || (host2ChannelId.isNotEmpty && host2ChannelId.contains(user.userID)))) {
+              Utils.showLog("Opponent PK user left room -> Disconnected");
+              handleOpponentDisconnected();
+            } else if (user.userID == liveUserId && !isHost) {
               Utils.showLog("Host Disconnected from Room! Exiting Live...");
               Utils.showToast("Live ended");
               Get.back();
@@ -1055,6 +1208,14 @@ class MultiLiveController extends GetxController {
               onStartPlayStream(stream.streamID);
             }
           }
+        } else if (updateType == ZegoUpdateType.Delete) {
+          for (final stream in streamList) {
+            Utils.showLog("*********** STREAM_DELETED *********** ${stream.streamID}");
+            if (liveUserObject?.isPkMode == true && (stream.streamID == host2ChannelId || host2ChannelId.isNotEmpty)) {
+              Utils.showLog("PK Stream stopped -> Opponent disconnected");
+              handleOpponentDisconnected();
+            }
+          }
         }
       };
       Utils.showLog("✅ START LISTEN EVENT SUCCESS");
@@ -1065,12 +1226,23 @@ class MultiLiveController extends GetxController {
 
   Future<void> onLoginRoom() async {
     try {
-      final localUserID = Database.fetchLoginUserProfileModel?.user?.id ?? "";
-      final localUserName = Database.fetchLoginUserProfileModel?.user?.name ?? "";
+      final localUserID = Database.loginUserId.isNotEmpty
+          ? Database.loginUserId
+          : (Database.fetchLoginUserProfileModel?.user?.id ?? "user_${DateTime.now().millisecondsSinceEpoch}");
+      final localUserName = (Database.fetchLoginUserProfileModel?.user?.name?.isNotEmpty == true)
+          ? (Database.fetchLoginUserProfileModel?.user?.name ?? "User")
+          : (Database.fetchLoginUserProfileModel?.user?.userName ?? "User");
 
       final user = ZegoUser(localUserID, localUserName);
 
-      final roomID = this.roomID;
+      final roomID = this.roomID.isNotEmpty ? this.roomID : (liveUserObject?.liveHistoryId ?? "");
+
+      if (roomID.isEmpty) {
+        Utils.showLog("❌ LoginRoom: roomID is empty!");
+        isLoading.value = false;
+        update(["onUpdateMultiLive"]);
+        return;
+      }
 
       ZegoRoomConfig roomConfig = ZegoRoomConfig.defaultConfig()..isUserStatusNotify = true;
 
@@ -1085,17 +1257,41 @@ class MultiLiveController extends GetxController {
           } else {
             SocketServices.userChats.clear();
             SocketServices.onAddView(loginUserId: Database.loginUserId, liveHistoryId: roomID);
+            if (remoteView == null && liveUserId.isNotEmpty) {
+              onStartPlayStream('${liveUserId}_call');
+            }
+          }
+        } else {
+          Utils.showLog("❌ ZEGO LOGIN ROOM RETURNED ERROR CODE: ${loginRoomResult.errorCode}");
+          if (isHost) {
+            onStartPreview();
+          } else {
+            isLoading.value = false;
+            update(["onUpdateMultiLive"]);
           }
         }
+      }).catchError((e) {
+        Utils.showLog("❌ ZEGO LOGIN ROOM PROMISE ERROR => $e");
+        isLoading.value = false;
+        update(["onUpdateMultiLive"]);
       });
       Utils.showLog("✅ LOGIN SUCCESS");
     } catch (e) {
       Utils.showLog("❌ LOGIN FAILED => $e");
+      isLoading.value = false;
+      update(["onUpdateMultiLive"]);
     }
   }
 
   Future<void> onStartPreview() async {
     try {
+      if (liveScreen != null && localViewID != null) {
+        isLoading.value = false;
+        update(["onUpdateMultiLive"]);
+        return;
+      }
+      await ZegoExpressEngine.instance.enableCamera(true);
+      await ZegoExpressEngine.instance.enableAudioCaptureDevice(true);
       applyMirrorMode();
       await ZegoExpressEngine.instance.createCanvasView((viewID) {
         localViewID = viewID;
@@ -1109,6 +1305,8 @@ class MultiLiveController extends GetxController {
       Utils.showLog("✅ START PREVIEW SUCCESS");
     } catch (e) {
       Utils.showLog("❌ START PREVIEW FAILED => $e");
+      isLoading.value = false;
+      update(["onUpdateMultiLive"]);
     }
   }
 
@@ -1126,6 +1324,11 @@ class MultiLiveController extends GetxController {
 
   Future<void> onStartPlayStream(String streamID) async {
     try {
+      if (remoteView != null && remoteViewID != null) {
+        isLoading.value = false;
+        update(["onUpdateMultiLive"]);
+        return;
+      }
       await ZegoExpressEngine.instance.createCanvasView((viewID) {
         remoteViewID = viewID;
         ZegoCanvas canvas = ZegoCanvas(viewID, viewMode: ZegoViewMode.AspectFill);
@@ -1133,11 +1336,13 @@ class MultiLiveController extends GetxController {
       }).then((canvasViewWidget) {
         remoteView = canvasViewWidget;
         isLoading.value = false;
-        update(["OnUpdateMultiLive"]);
+        update(["onUpdateMultiLive"]);
         Utils.showLog("✅ START PLAY STREAM SUCCESS");
       });
     } catch (e) {
       Utils.showLog("❌ START PLAY STREAM FAILED => $e");
+      isLoading.value = false;
+      update(["onUpdateMultiLive"]);
     }
   }
 
@@ -1183,7 +1388,7 @@ class MultiLiveController extends GetxController {
         ZegoExpressEngine.instance.destroyCanvasView(remoteViewID!);
         remoteViewID = null;
         remoteView = null;
-        update(["OnUpdateMultiLive"]);
+        update(["onUpdateMultiLive"]);
       }
       Utils.showLog("✅ STOP PLAY STREAM SUCCESS");
     } catch (e) {

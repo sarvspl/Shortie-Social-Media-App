@@ -575,6 +575,7 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                       ? _buildOffCameraUserProfile(logic, Get.height / 2.7, Get.width)
                       : SizedBox(
                           height: Get.height / 2.7,
+                          width: double.infinity,
                           child: logic.isHost ? logic.liveScreen : logic.remoteView,
                         ),
                   // Host 1 Pink Name Badge on top-left of video
@@ -607,6 +608,7 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                 children: [
                   SizedBox(
                     height: Get.height / 2.7,
+                    width: double.infinity,
                     child: PkHostVideoView(
                       streamID: logic.host2ChannelId,
                       height: Get.height / 2.7,
@@ -953,20 +955,26 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Quick Gift Carousel (matching reference image)
+            // Quick Gift Carousel (dynamic from backend)
             if (controller.isHost == false)
               ModernQuickGiftBarWidget(
-                onSendGift: (coins, giftName) {
+                onSendGift: (gift) {
+                  final int coins = gift.coin ?? 0;
                   if ((CustomFetchUserCoin.coin.value == 0 || CustomFetchUserCoin.coin.value < coins)) {
                     Utils.showToast(EnumLocal.txtYouDonHaveSufficientCoinsToSendTheGift.name.tr);
                     return;
                   }
+                  final String giftId = gift.id ?? "";
+                  final String giftUrl = gift.image ?? "";
+                  final String svgaUrl = gift.svgaImage ?? "";
+                  final int giftType = gift.type ?? 1;
+
                   if (controller.liveUserObject?.isPkMode ?? false) {
                     SocketServices.onPkSendGift(
                       coin: coins,
-                      giftType: 1,
-                      giftUrl: "",
-                      giftId: "quick_$coins",
+                      giftType: giftType,
+                      giftUrl: giftUrl,
+                      giftId: giftId,
                       senderUserId: Database.loginUserId,
                       receiverUserIds: [controller.liveUserObject?.userId ?? ""],
                       liveHistoryId: controller.liveUserObject?.liveHistoryId ?? "",
@@ -978,22 +986,22 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                   } else {
                     SocketServices.onLiveSendGift(
                       coin: coins,
-                      giftType: 1,
-                      giftUrl: "",
-                      giftId: "quick_$coins",
+                      giftType: giftType,
+                      giftUrl: giftUrl,
+                      giftId: giftId,
                       senderUserId: Database.loginUserId,
                       receiverUserId: [controller.liveUserObject?.userId ?? ""],
                       liveHistoryId: controller.liveUserObject?.liveHistoryId ?? "",
-                      svgaUrl: '',
-                      senderUserName: '',
-                      liveUserObjId: '',
+                      svgaUrl: svgaUrl,
+                      senderUserName: Database.fetchLoginUserProfileModel?.user?.userName ?? "",
+                      liveUserObjId: controller.liveUserObject?.id ?? "",
                       senderName: Database.fetchLoginUserProfileModel?.user?.name ?? "",
                       senderImage: Database.fetchLoginUserProfileModel?.user?.image ?? "",
                       senderUniqueId: Database.fetchLoginUserProfileModel?.user?.uniqueId ?? "",
                       senderProfilePicBanned: Database.fetchLoginUserProfileModel?.user?.isProfileImageBanned ?? false,
                     );
                   }
-                  Utils.showToast("Sent $giftName to Host!");
+                  Utils.showToast("Sent gift ($coins coins) to Host!");
                 },
               ),
             Container(
