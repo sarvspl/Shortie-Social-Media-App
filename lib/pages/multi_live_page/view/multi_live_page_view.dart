@@ -515,6 +515,50 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
     );
   }
 
+  Widget SuperTimerShow() {
+    return GetBuilder<MultiLiveController>(
+      id: 'onUpdateMultiLive',
+      builder: (logic) => Container(
+        child: logic.pkUntilSuperTime > 0
+            ? GiftingReminder(
+                creatorName: logic.host1Name,
+                timeUntilEvent: Duration(seconds: logic.pkUntilSuperTime ?? 0),
+              )
+            : Visibility(
+                visible: logic.isOnSuperTimer.value,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: AppColor.primaryLinearGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        "X ${Utils.isShowMultiplier} ${EnumLocal.txtGiftingPoints.name.tr}",
+                        style: AppFontStyle.styleW800(AppColor.white, 14),
+                      ),
+                      10.width,
+                      Container(
+                        height: 15,
+                        width: 1,
+                        color: AppColor.white,
+                      ),
+                      10.width,
+                      Text(
+                        logic.onConvertSecondOnly(logic.pkSuperCountTime),
+                        style: AppFontStyle.styleW800(AppColor.white, 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+      ),
+    );
+  }
+
   // PK Battle view with hosts and animations
   Widget _buildPkBattleView(MultiLiveController logic) {
     return Stack(

@@ -187,7 +187,7 @@ class ModernPkScoreBarWidget extends StatelessWidget {
 
   String? _extractGifterImage(dynamic item) {
     if (item == null) return null;
-    if (item is TopGifter) return item.userId?.image;
+    if (item is PkGiftTopUserModel) return item.userId?.image;
     if (item is Map) return item["image"] ?? item["userImage"];
     try {
       return item.userId?.image ?? item.image;
