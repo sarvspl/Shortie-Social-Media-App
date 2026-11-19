@@ -6,7 +6,6 @@ import 'package:shortie/google_ad/google_ad_full_native_video.dart';
 import 'package:shortie/main.dart';
 import 'package:shortie/pages/reels_page/controller/reels_controller.dart';
 import 'package:shortie/pages/reels_page/widget/reels_widget.dart';
-import 'package:shortie/routes/app_routes.dart';
 import 'package:shortie/shimmer/reels_shimmer_ui.dart';
 import 'package:shortie/ui/no_data_found_ui.dart';
 import 'package:shortie/ui/video_picker_bottom_sheet_ui.dart';
@@ -15,14 +14,14 @@ import 'package:shortie/utils/constant.dart';
 import 'package:shortie/utils/enums.dart';
 import 'package:shortie/utils/font_style.dart';
 
-class ReelsView extends GetView<ReelsController> {
+class ReelsView extends StatelessWidget {
   const ReelsView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    if (Get.currentRoute == AppRoutes.bottomBarPage) {
-      controller.init();
-    }
+    final ReelsController reelsController = Get.isRegistered<ReelsController>()
+        ? Get.find<ReelsController>()
+        : Get.put(ReelsController(), permanent: true);
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -34,6 +33,7 @@ class ReelsView extends GetView<ReelsController> {
     return Scaffold(
       body: GetBuilder<ReelsController>(
         id: "onGetReels",
+        init: reelsController,
         builder: (controller) => controller.isLoadingReels
             ? ReelsShimmerUi()
             : controller.mainReels.isEmpty
@@ -107,7 +107,7 @@ class ReelsView extends GetView<ReelsController> {
                     child: PreloadPageView.builder(
                       controller: controller.preloadPageController,
                       itemCount: controller.mainReels.length,
-                      // preloadPagesCount: 4,
+                      preloadPagesCount: 2,
                       scrollDirection: Axis.vertical,
                       onPageChanged: (value) async {
                         controller.onPagination(value);

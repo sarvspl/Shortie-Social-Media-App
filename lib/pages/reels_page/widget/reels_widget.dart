@@ -19,7 +19,6 @@ import 'package:shortie/pages/fake_live_page/widget/fake_send_gift_bottom_sheet_
 import 'package:shortie/pages/reels_page/api/reels_like_dislike_api.dart';
 import 'package:shortie/pages/reels_page/api/reels_share_api.dart';
 import 'package:shortie/pages/reels_page/controller/reels_controller.dart';
-import 'package:shortie/pages/fake_live_page/widget/fake_comment_data.dart';
 // Reels API models (for Story in controller.mainReels[index].stories)
 import 'package:shortie/pages/reels_page/model/fetch_reels_model.dart' show Story;
 import 'package:shortie/pages/splash_screen_page/api/send_gift_api.dart';
@@ -56,7 +55,9 @@ class PreviewReelsView extends StatefulWidget {
 }
 
 class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerProviderStateMixin {
-  final controller = Get.find<ReelsController>();
+  ReelsController get controller => Get.isRegistered<ReelsController>()
+      ? Get.find<ReelsController>()
+      : Get.put(ReelsController(), permanent: true);
 
   ChewieController? chewieController;
   VideoPlayerController? videoPlayerController;
@@ -105,37 +106,55 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
 
   Future<void> initializeVideoPlayer() async {
     try {
-      final videoPath = controller.mainReels[widget.index].videoUrl!;
-      videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoPath));
+      final rawPath = controller.mainReels[widget.index].videoUrl ?? "";
+      final videoPath = Utils.resolveUrl(rawPath);
+      Utils.showLog("Initializing video player at index ${widget.index} => $videoPath");
 
-      await videoPlayerController?.initialize();
+      isVideoLoading.value = true;
+
+      try {
+        videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(videoPath));
+        await videoPlayerController?.initialize().timeout(const Duration(seconds: 10));
+      } catch (err) {
+        Utils.showLog("⚠️ Video initialize failed or timed out on $videoPath: $err");
+        try {
+          await videoPlayerController?.dispose();
+        } catch (_) {}
+        videoPlayerController = null;
+      }
 
       if (videoPlayerController != null && (videoPlayerController?.value.isInitialized ?? false)) {
-        chewieController = ChewieController(
-          videoPlayerController: videoPlayerController!,
-          looping: true,
-          allowedScreenSleep: false,
-          allowMuting: false,
-          showControlsOnInitialize: false,
-          showControls: false,
-          maxScale: 1,
-        );
+        await videoPlayerController?.setLooping(true);
+        await videoPlayerController?.setVolume(1.0);
+        isVideoLoading.value = false;
+        if (mounted) setState(() {});
 
-        if (chewieController != null) {
-          isVideoLoading.value = false;
-          if (widget.index == widget.currentPageIndex && Utils.isCurrentlyVideoPage.value) onPlayVideo();
-        } else {
-          isVideoLoading.value = true;
-        }
+        try {
+          chewieController = ChewieController(
+            videoPlayerController: videoPlayerController!,
+            looping: true,
+            allowedScreenSleep: false,
+            allowMuting: false,
+            showControlsOnInitialize: false,
+            showControls: false,
+            maxScale: 1,
+          );
+        } catch (_) {}
+
+        if (widget.index == widget.currentPageIndex && Utils.isCurrentlyVideoPage.value) onPlayVideo();
 
         videoPlayerController?.addListener(() {
           isBuffering.value = videoPlayerController?.value.isBuffering ?? false;
           if (Utils.isCurrentlyVideoPage.value == false) onStopVideo();
         });
+      } else {
+        isVideoLoading.value = false;
+        if (mounted) setState(() {});
       }
     } catch (e) {
       onDisposeVideoPlayer();
       isVideoLoading.value = false;
+      if (mounted) setState(() {});
       Utils.showLog("Reels Video Initialization Failed !!! ${widget.index} => $e");
     }
   }
@@ -147,7 +166,7 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
       chewieController?.dispose();
       chewieController = null;
       videoPlayerController = null;
-      isVideoLoading.value = true;
+      isVideoLoading.value = false;
     } catch (e) {
       Utils.showLog(">>>> On Dispose VideoPlayer Error => $e");
     }
@@ -173,17 +192,22 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
       Utils.isCurrentlyVideoPage.value = true;
     }
 
+    if (videoPlayerController == null || !(videoPlayerController?.value.isInitialized ?? false)) {
+      initializeVideoPlayer();
+      return;
+    }
+
     videoPlayerController!.value.isPlaying ? onStopVideo() : onPlayVideo();
   }
 
   void customSetting() {
-    isLike.value = controller.mainReels[widget.index].isLike ?? false;
-    customChanges["like"] = int.parse(controller.mainReels[widget.index].totalLikes.toString());
-    int commentCount = int.parse(controller.mainReels[widget.index].totalComments.toString());
-    if (commentCount == 0) {
-      commentCount = fakeHostCommentListBlank.length;
-    }
-    customChanges["comment"] = commentCount;
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
+    final item = controller.mainReels[widget.index];
+    isLike.value = item?.isLike ?? false;
+    final rawLikes = item?.totalLikes;
+    customChanges["like"] = (rawLikes != null) ? (int.tryParse(rawLikes.toString()) ?? 0) : 0;
+    final rawComments = item?.totalComments;
+    customChanges["comment"] = (rawComments != null) ? (int.tryParse(rawComments.toString()) ?? 0) : 0;
   }
 
   void onClickVideo() async {
@@ -236,9 +260,13 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
   }
 
   Future<void> onClickLike() async {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
+    final videoId = controller.mainReels[widget.index]?.id ?? "";
+    if (videoId.isEmpty) return;
+
     if (isLike.value) {
       isLike.value = false;
-      customChanges["like"]--;
+      customChanges["like"] = (customChanges["like"] > 0) ? (customChanges["like"] - 1) : 0;
     } else {
       isLike.value = true;
       customChanges["like"]++;
@@ -247,7 +275,7 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
 
     await ReelsLikeDislikeApi.callApi(
       loginUserId: Database.loginUserId,
-      videoId: controller.mainReels[widget.index].id!,
+      videoId: videoId,
     );
   }
 
@@ -260,9 +288,13 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
   }
 
   Future<void> onDoubleClick() async {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
+    final videoId = controller.mainReels[widget.index]?.id ?? "";
+    if (videoId.isEmpty) return;
+
     if (isLike.value) {
       isLike.value = false;
-      customChanges["like"]--;
+      customChanges["like"] = (customChanges["like"] > 0) ? (customChanges["like"] - 1) : 0;
     } else {
       isLike.value = true;
       customChanges["like"]++;
@@ -271,14 +303,15 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
 
     await ReelsLikeDislikeApi.callApi(
       loginUserId: Database.loginUserId,
-      videoId: controller.mainReels[widget.index].id!,
+      videoId: videoId,
     );
   }
 
   void onHorizontalDragEnd(details) {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
     if ((details.primaryVelocity ?? 0.0) < 0) {
       onStopVideo();
-      Get.toNamed(AppRoutes.previewUserProfilePage, arguments: controller.mainReels[widget.index].userId)?.then(
+      Get.toNamed(AppRoutes.previewUserProfilePage, arguments: controller.mainReels[widget.index]?.userId)?.then(
         (value) {
           onPlayVideo();
         },
@@ -287,30 +320,39 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
   }
 
   Future<void> onClickComment() async {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
+    final videoId = controller.mainReels[widget.index]?.id ?? "";
+    if (videoId.isEmpty) return;
+
     onAutoStopVideo();
 
     customChanges["comment"] = await CommentBottomSheetUi.show(
       context: context,
       commentType: 2,
-      commentTypeId: controller.mainReels[widget.index].id!,
+      commentTypeId: videoId,
       totalComments: customChanges["comment"],
       onComplete: onClickPlayPause,
-      showFakeComment: true,
+      showFakeComment: false,
     );
   }
 
   Future<void> onClickShare() async {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
+    final item = controller.mainReels[widget.index];
+    final videoId = item?.id ?? "";
+    if (videoId.isEmpty) return;
+
     onAutoStopVideo();
 
     Get.dialog(const LoadingUi(), barrierDismissible: false);
 
     try {
-      final image = controller.mainReels[widget.index].videoImage ?? "";
+      final image = item?.videoImage ?? "";
 
       await ShareManager.shareContent(
-        id: controller.mainReels[widget.index].id ?? "",
-        title: controller.mainReels[widget.index].caption ?? "",
-        imageUrl: (image?.startsWith("https") ?? false) ? (image ?? "") : (Api.baseUrl + (image ?? "")),
+        id: videoId,
+        title: item?.caption ?? "",
+        imageUrl: (image.startsWith("https")) ? image : (Api.baseUrl + image),
         shareType: ShareType.withImage,
         // Choose your preferred type
         pageRoutes: DeepLinkServices.reels,
@@ -318,7 +360,7 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
 
       await ReelsShareApi.callApi(
         loginUserId: Database.loginUserId,
-        videoId: controller.mainReels[widget.index].id!,
+        videoId: videoId,
       );
     } finally {
       Get.back();
@@ -330,18 +372,32 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
   void onClickMusic() async {
     onAutoStopVideo();
 
-    if ((controller.mainReels[widget.index].songId ?? "").toString().isNotEmpty) {
-      Get.toNamed(AppRoutes.audioWiseVideosPage, arguments: controller.mainReels[widget.index].songId);
-    } else if (controller.mainReels[widget.index].userId != Database.loginUserId) {
-      PreviewProfileBottomSheetUi.show(
-        context: context,
-        userId: controller.mainReels[widget.index].userId ?? "",
-        onComplete: onClickPlayPause,
-      );
-    } else {
-      final controller = Get.find<BottomBarController>();
-      controller.onChangeBottomBar(4);
-    }
+    final item = controller.mainReels[widget.index];
+    final songId = (item.songId ?? "").toString();
+    final songTitle = (item.songTitle ?? "").toString().trim().isNotEmpty
+        ? item.songTitle!
+        : (songId.isNotEmpty ? "Soundtrack" : "Original Audio - ${item.name ?? item.userName ?? "User"}");
+    final singerName = (item.singerName ?? "").toString().trim().isNotEmpty
+        ? item.singerName!
+        : (item.name ?? item.userName ?? "Original Artist");
+    final songImage = (item.songImage ?? "").toString().trim().isNotEmpty
+        ? item.songImage!
+        : (item.videoImage ?? item.userImage ?? "");
+    final songLink = (item.songLink ?? "").toString().trim().isNotEmpty
+        ? item.songLink!
+        : (item.videoUrl ?? "");
+
+    Get.toNamed(
+      AppRoutes.audioWiseVideosPage,
+      arguments: {
+        "songId": songId,
+        "songTitle": songTitle,
+        "singerName": singerName,
+        "songImage": songImage,
+        "songLink": songLink,
+        "reel": item,
+      },
+    );
   }
 
   void onClickProfile() async {
@@ -375,34 +431,35 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
       backgroundSong: s.backgroundSong == null
           ? null
           : Viewer.BackgroundSong(
-              id: s.backgroundSong!.id,
-              songTitle: s.backgroundSong!.songTitle,
-              songImage: s.backgroundSong!.songImage,
-              singerName: s.backgroundSong!.singerName,
-              songTime: s.backgroundSong!.songTime,
-              songLink: s.backgroundSong!.songLink,
+              id: s.backgroundSong?.id,
+              songTitle: s.backgroundSong?.songTitle,
+              songImage: s.backgroundSong?.songImage,
+              singerName: s.backgroundSong?.singerName,
+              songTime: s.backgroundSong?.songTime,
+              songLink: s.backgroundSong?.songLink,
             ),
     );
   }
 
   Future<void> _openUserStoriesFromReel() async {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) return;
     final item = controller.mainReels[widget.index];
-    final hasStories = (item.stories?.isNotEmpty ?? false);
+    final hasStories = (item?.stories?.isNotEmpty ?? false);
     if (!hasStories) return;
 
-    // 👇 force the generic + annotate variable type
-    final List<Viewer.Stories> stories = item.stories!.map<Viewer.Stories>((s) => _mapToViewerStory(s)).toList();
+    final List<Viewer.Stories> stories = item?.stories?.map<Viewer.Stories>((s) => _mapToViewerStory(s)).toList() ?? [];
+    if (stories.isEmpty) return;
 
     final group = Viewer.StoryGroup(
       user: Viewer.User(
-        id: item.userId ?? item.id,
-        name: item.name ?? "",
-        userName: item.userName ?? "",
-        image: item.userImage ?? "",
-        isFake: item.userIsFake ?? false,
-        isProfileImageBanned: item.isProfileImageBanned ?? false,
+        id: item?.userId ?? item?.id ?? "",
+        name: item?.name ?? "",
+        userName: item?.userName ?? "",
+        image: item?.userImage ?? "",
+        isFake: item?.userIsFake ?? false,
+        isProfileImageBanned: item?.isProfileImageBanned ?? false,
       ),
-      stories: stories, // ✅ now List<Viewer.Stories>
+      stories: stories,
     );
 
     await StoryViewer.openOthers(groups: [group], initialGroupIndex: 0);
@@ -410,6 +467,13 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    if (widget.index >= controller.mainReels.length || controller.mainReels[widget.index] == null) {
+      return const SizedBox.shrink();
+    }
+
+    final item = controller.mainReels[widget.index];
+    if (item == null) return const SizedBox.shrink();
+
     if (widget.index == widget.currentPageIndex) {
       isReadMore.value = false;
       if (!isVideoLoading.value && Utils.isCurrentlyVideoPage.value) onPlayVideo();
@@ -418,7 +482,6 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
       onStopVideo();
     }
 
-    final item = controller.mainReels[widget.index];
     final bool hasStories = (item.stories?.isNotEmpty ?? false);
     final GlobalKey likeKey = GlobalKey();
     return Scaffold(
@@ -448,41 +511,82 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
                 child: Stack(
                   children: [
                     Obx(
-                      () => isVideoLoading.value
-                          ? Container(
-                              color: Colors.black,
-                              child: Stack(
-                                children: [
-                                  if (item.videoImage != null)
-                                    SizedBox(
-                                      height: Get.height,
-                                      width: Get.width,
-                                      child: CachedNetworkImage(
-                                        imageUrl: item.videoImage ?? '',
-                                        fit: BoxFit.cover,
-                                        errorWidget: (context, url, error) => Container(color: Colors.black),
-                                      ),
-                                    ),
-                                  Center(
-                                    child: Lottie.asset(
-                                      AppAsset.lottieReelsLoader,
-                                      width: 150,
-                                      height: 150,
-                                    ),
+                      () {
+                        final bool isVideoReady = !isVideoLoading.value &&
+                            videoPlayerController != null &&
+                            (videoPlayerController?.value.isInitialized ?? false);
+
+                        return isVideoReady
+                            ? SizedBox.expand(
+                                child: FittedBox(
+                                  fit: BoxFit.cover,
+                                  child: SizedBox(
+                                    width: (videoPlayerController?.value.size.width != null && (videoPlayerController?.value.size.width ?? 0) > 0)
+                                        ? (videoPlayerController?.value.size.width ?? Get.width)
+                                        : Get.width,
+                                    height: (videoPlayerController?.value.size.height != null && (videoPlayerController?.value.size.height ?? 0) > 0)
+                                        ? (videoPlayerController?.value.size.height ?? Get.height)
+                                        : Get.height,
+                                    child: videoPlayerController != null ? VideoPlayer(videoPlayerController!) : const SizedBox.shrink(),
                                   ),
-                                ],
-                              ),
-                            )
-                          : SizedBox.expand(
-                              child: FittedBox(
-                                fit: BoxFit.cover,
-                                child: SizedBox(
-                                  width: videoPlayerController?.value.size.width ?? 0,
-                                  height: videoPlayerController?.value.size.height ?? 0,
-                                  child: Chewie(controller: chewieController!),
                                 ),
-                              ),
-                            ),
+                              )
+                            : Container(
+                                color: Colors.black,
+                                child: Stack(
+                                  children: [
+                                    if (item.videoImage != null && (item.videoImage?.isNotEmpty ?? false))
+                                      SizedBox(
+                                        height: Get.height,
+                                        width: Get.width,
+                                        child: CachedNetworkImage(
+                                          imageUrl: Utils.resolveUrl(item.videoImage),
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: 720,
+                                          memCacheHeight: 1280,
+                                          placeholder: (context, url) => Container(color: Colors.black),
+                                          errorWidget: (context, url, error) {
+                                            Utils.showLog("❌ Reels thumbnail CachedNetworkImage error on $url => $error");
+                                            final cleanThumb = Utils.resolveUrl(item.videoImage);
+                                            return Image.network(
+                                              cleanThumb,
+                                              fit: BoxFit.cover,
+                                              cacheWidth: 720,
+                                              cacheHeight: 1280,
+                                              errorBuilder: (context, error2, stack) => Container(color: Colors.black),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    if (isVideoLoading.value)
+                                      Center(
+                                        child: Lottie.asset(
+                                          AppAsset.lottieReelsLoader,
+                                          width: 150,
+                                          height: 150,
+                                        ),
+                                      ),
+                                    if (!isVideoLoading.value &&
+                                        (videoPlayerController == null ||
+                                            !(videoPlayerController?.value.isInitialized ?? false)))
+                                      Center(
+                                        child: GestureDetector(
+                                          onTap: initializeVideoPlayer,
+                                          child: Container(
+                                            height: 60,
+                                            width: 60,
+                                            decoration: BoxDecoration(
+                                              color: Colors.black.withOpacity(0.6),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 40),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              );
+                      },
                     ),
                     Obx(
                       () => isBuffering.value
@@ -706,7 +810,11 @@ class _PreviewReelsViewState extends State<PreviewReelsView> with SingleTickerPr
                                   alignment: Alignment.center,
                                   children: [
                                     Image.asset(AppAsset.icProfilePlaceHolder),
-                                    PreviewNetworkImageUi(image: item.userImage),
+                                    PreviewNetworkImageUi(
+                                      image: (item.songImage != null && item.songImage!.isNotEmpty)
+                                          ? item.songImage
+                                          : item.userImage,
+                                    ),
                                     if (item.isProfileImageBanned ?? false) const _BannedBlurCircle(),
                                   ],
                                 ),

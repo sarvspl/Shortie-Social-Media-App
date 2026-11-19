@@ -5,12 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_rx/src/rx_typedefs/rx_typedefs.dart';
-import 'package:http/http.dart' as http;
 import 'package:shortie/custom/custom_svga_player.dart';
-import 'package:shortie/utils/api.dart';
 import 'package:shortie/utils/asset.dart';
 import 'package:shortie/utils/color.dart';
-import 'package:shortie/utils/database.dart';
 import 'package:shortie/utils/utils.dart';
 
 class PreviewNetworkImageUi extends StatelessWidget {
@@ -21,65 +18,34 @@ class PreviewNetworkImageUi extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return (image != null && image != "")
-        ? (image!.startsWith("http") || image!.startsWith("https"))
-            ? CachedNetworkImage(
-                imageUrl: image ?? "",
-                fit: boxFit ?? BoxFit.cover,
-                errorWidget: (context, url, error) => Offstage(),
-                placeholder: (context, url) => Offstage(),
-              )
-            : Image.file(
-                File(image ?? ""),
-                fit: boxFit ?? BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return CachedNetworkImage(
-                    imageUrl: image ?? "",
-                    fit: boxFit ?? BoxFit.cover,
-                    errorWidget: (context, url, error) => Offstage(),
-                    placeholder: (context, url) => Offstage(),
-                  );
-                },
-              )
-        : Offstage();
+    final cleanImage = Utils.resolveUrl(image);
+    if (cleanImage.isEmpty) return const Offstage();
 
-    // Database.networkImage(Api.baseUrl + image!) != null
-    //             ? CachedNetworkImage(
-    //                 imageUrl: Database.networkImage(Api.baseUrl + image!)!,
-    //                 fit: BoxFit.cover,
-    //                 errorWidget: (context, url, error) => Offstage(),
-    //                 placeholder: (context, url) {
-    //                   return AspectRatio(
-    //                     aspectRatio: 1,
-    //                     child: Image.asset(
-    //                       AppAsset.icProfilePlaceHolder,
-    //                       fit: boxFit ?? BoxFit.cover,
-    //                     ),
-    //                   );
-    //                 },
-    //               )
-    //             : FutureBuilder(
-    //                 future: _onCheckImage(Api.baseUrl + image!),
-    //                 builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
-    //                   if (snapshot.connectionState == ConnectionState.waiting) {
-    //                     return Offstage();
-    //                   } else if (snapshot.hasError) {
-    //                     return Offstage();
-    //                   } else {
-    //                     if (snapshot.data == true) {
-    //                       Database.onSetNetworkImage(Api.baseUrl + image!);
-    //                       return CachedNetworkImage(
-    //                         imageUrl: Api.baseUrl + image!,
-    //                         fit: BoxFit.cover,
-    //                         errorWidget: (context, url, error) => Offstage(),
-    //                       );
-    //                     } else {
-    //                       return Offstage();
-    //                     }
-    //                   }
-    //                 },
-    //               )
-    //     : Offstage();
+    if (cleanImage.startsWith("http://") || cleanImage.startsWith("https://")) {
+      return CachedNetworkImage(
+        imageUrl: cleanImage,
+        fit: boxFit ?? BoxFit.cover,
+        memCacheWidth: 720,
+        memCacheHeight: 720,
+        placeholder: (context, url) => Image.asset(AppAsset.icProfilePlaceHolder, fit: boxFit ?? BoxFit.cover),
+        errorWidget: (context, url, error) {
+          Utils.showLog("❌ PreviewNetworkImageUi error on $url => $error. Falling back to Image.network.");
+          return Image.network(
+            cleanImage,
+            fit: boxFit ?? BoxFit.cover,
+            errorBuilder: (context, error2, stack) {
+              return Image.asset(AppAsset.icProfilePlaceHolder, fit: boxFit ?? BoxFit.cover);
+            },
+          );
+        },
+      );
+    } else {
+      return Image.file(
+        File(cleanImage),
+        fit: boxFit ?? BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Offstage(),
+      );
+    }
   }
 }
 
@@ -100,17 +66,6 @@ class PreviewBannedNetworkImageUi extends StatelessWidget {
   }
 }
 
-Future<bool> _onCheckImage(String image) async {
-  try {
-    final response = await http.head(Uri.parse(image));
-
-    return response.statusCode == 200;
-  } catch (e) {
-    Utils.showLog('Check Profile Image Filed !! => $e');
-    return false;
-  }
-}
-
 class PreviewProfileImageWidget extends StatelessWidget {
   const PreviewProfileImageWidget({super.key, this.image, this.fit, this.isBanned, this.isShowPlaceHolder});
 
@@ -121,73 +76,48 @@ class PreviewProfileImageWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, box) {
-      final cacheHeight = (box.maxHeight * 2).toInt();
-      final cacheWidth = (box.maxWidth * 2).toInt();
+    final cleanImage = Utils.resolveUrl(image);
+    if (cleanImage.isEmpty) {
+      return isShowPlaceHolder == false ? const Offstage() : const ProfileImagePlaceHolder();
+    }
 
-      return (image != null && image != "")
-          ? image!.startsWith("https") || image!.startsWith("http")
-              ? CachedNetworkImage(
-                  imageUrl: image ?? "",
+    return LayoutBuilder(builder: (context, box) {
+      Widget imageWidget = (cleanImage.startsWith("http://") || cleanImage.startsWith("https://"))
+          ? CachedNetworkImage(
+              imageUrl: cleanImage,
+              fit: fit ?? BoxFit.cover,
+              memCacheWidth: 300,
+              memCacheHeight: 300,
+              placeholder: (context, url) => isShowPlaceHolder == false ? const Offstage() : const ProfileImagePlaceHolder(),
+              errorWidget: (context, url, error) {
+                Utils.showLog("❌ PreviewProfileImageWidget error on $url => $error. Falling back to Image.network.");
+                return Image.network(
+                  cleanImage,
                   fit: fit ?? BoxFit.cover,
-                  errorWidget: (context, url, error) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                  placeholder: (context, url) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                  memCacheHeight: cacheHeight,
-                  maxHeightDiskCache: cacheHeight,
-                  memCacheWidth: cacheWidth,
-                  maxWidthDiskCache: cacheWidth,
-                )
-              : Database.networkImage(Api.baseUrl + image!) != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl: (Api.baseUrl + (image ?? "")),
-                          fit: fit ?? BoxFit.cover,
-                          errorWidget: (context, url, error) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                          placeholder: (context, url) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                          memCacheHeight: cacheHeight,
-                          maxHeightDiskCache: cacheHeight,
-                          memCacheWidth: cacheWidth,
-                          maxWidthDiskCache: cacheWidth,
-                        ),
-                        Visibility(
-                          visible: isBanned ?? false,
-                          child: BlurryContainer(
-                            blur: 3,
-                            color: AppColor.black.withValues(alpha: 0.2),
-                            child: Offstage(),
-                          ),
-                        )
-                      ],
-                    )
-                  : FutureBuilder(
-                      future: _onCheckImage(Api.baseUrl + image!),
-                      builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder();
-                        } else if (snapshot.hasError) {
-                          return isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder();
-                        } else {
-                          if (snapshot.data == true) {
-                            Database.onSetNetworkImage(Api.baseUrl + image!);
-                            return CachedNetworkImage(
-                              imageUrl: Api.baseUrl + image!,
-                              fit: fit ?? BoxFit.cover,
-                              placeholder: (context, url) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                              errorWidget: (context, url, error) => isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder(),
-                              memCacheHeight: cacheHeight,
-                              maxHeightDiskCache: cacheHeight,
-                              memCacheWidth: cacheWidth,
-                              maxWidthDiskCache: cacheWidth,
-                            );
-                          } else {
-                            return isShowPlaceHolder == false ? Offstage() : ProfileImagePlaceHolder();
-                          }
-                        }
-                      },
-                    )
-          : ProfileImagePlaceHolder();
+                  errorBuilder: (context, error2, stack) => isShowPlaceHolder == false ? const Offstage() : const ProfileImagePlaceHolder(),
+                );
+              },
+            )
+          : Image.file(
+              File(cleanImage),
+              fit: fit ?? BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => isShowPlaceHolder == false ? const Offstage() : const ProfileImagePlaceHolder(),
+            );
+
+      if (isBanned == true) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            imageWidget,
+            BlurryContainer(
+              blur: 3,
+              color: AppColor.black.withValues(alpha: 0.2),
+              child: const Offstage(),
+            ),
+          ],
+        );
+      }
+      return imageWidget;
     });
   }
 }
@@ -210,78 +140,51 @@ class PreviewPostImageWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, box) {
-      return (image != null && image != "")
-          ? image!.startsWith("https") || image!.startsWith("http")
-              ? Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: image != null ? ((image ?? "")) : "",
-                      fit: fit,
-                      errorWidget: (context, url, error) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                      placeholder: (context, url) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                      width: double.infinity,
-                      height: double.infinity,
-                    ),
-                    Visibility(
-                      visible: isBanned ?? false,
-                      child: BlurryContainer(
-                        blur: 10,
-                        color: AppColor.black.withValues(alpha: 0.3),
-                        child: Offstage(),
-                      ),
-                    )
-                  ],
-                )
-              : Database.networkImage(Api.baseUrl + image!) != null
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl: image != null ? (Api.baseUrl + (image ?? "")) : "",
-                          fit: fit,
-                          errorWidget: (context, url, error) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                          placeholder: (context, url) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                          width: double.infinity,
-                          height: double.infinity,
-                        ),
-                        Visibility(
-                          visible: isBanned ?? false,
-                          child: BlurryContainer(
-                            blur: 10,
-                            color: AppColor.black.withValues(alpha: 0.3),
-                            child: Offstage(),
-                          ),
-                        )
-                      ],
-                    )
-                  : FutureBuilder(
-                      future: _onCheckImage(Api.baseUrl + image!),
-                      builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder);
-                        } else if (snapshot.hasError) {
-                          return PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder);
-                        } else {
-                          if (snapshot.data == true) {
-                            Database.onSetNetworkImage(Api.baseUrl + image!);
-                            return CachedNetworkImage(
-                              imageUrl: Api.baseUrl + image!,
-                              fit: fit,
-                              placeholder: (context, url) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                              errorWidget: (context, url, error) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
-                              width: double.infinity,
-                              height: double.infinity,
-                            );
-                          } else {
-                            return PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder);
-                          }
-                        }
-                      },
-                    )
-          : PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder);
-    });
+    final cleanImage = Utils.resolveUrl(image);
+    if (cleanImage.isEmpty) {
+      return PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder);
+    }
+
+    Widget imageWidget = (cleanImage.startsWith("http://") || cleanImage.startsWith("https://"))
+        ? CachedNetworkImage(
+            imageUrl: cleanImage,
+            fit: fit ?? BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            placeholder: (context, url) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
+            errorWidget: (context, url, error) {
+              Utils.showLog("❌ PreviewPostImageWidget error on $url => $error. Falling back to Image.network.");
+              return Image.network(
+                cleanImage,
+                fit: fit ?? BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (context, error2, stack) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
+              );
+            },
+          )
+        : Image.file(
+            File(cleanImage),
+            fit: fit ?? BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (context, error, stackTrace) => PostImagePlaceHolder(size: size, isShowPlaceHolder: isShowPlaceHolder),
+          );
+
+    if (isBanned == true) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          imageWidget,
+          BlurryContainer(
+            blur: 10,
+            color: AppColor.black.withValues(alpha: 0.3),
+            child: const Offstage(),
+          ),
+        ],
+      );
+    }
+    return imageWidget;
   }
 }
 
@@ -305,69 +208,54 @@ class CustomPreviewImage extends StatelessWidget {
   final double? placeHolderSize;
   final int? imageQuality;
   final bool? isShowPlaceHolder; // DEFAULT VALUE => TRUE
-
   final EdgeInsetsGeometry? placeHolderPadding;
 
   @override
   Widget build(BuildContext context) {
-    final int? previewImageQuality = imageQuality ?? ((isProfileImage == false) ? null : null);
+    final cleanImage = Utils.resolveUrl(image);
+    final fallbackPlaceholder = isProfileImage == false
+        ? PostImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder, padding: placeHolderPadding)
+        : ProfileImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder, padding: placeHolderPadding);
 
-    return (image?.trim().isNotEmpty ?? false)
-        ? Stack(
-            fit: StackFit.expand,
-            children: [
-              (image!.startsWith("http") || image!.startsWith("https"))
-                  ? CachedNetworkImage(
-                      imageUrl: image ?? "",
-                      fit: fit ?? BoxFit.cover,
-                      placeholder: (context, url) => isProfileImage == false
-                          ? PostImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder)
-                          : ProfileImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder),
-                      maxHeightDiskCache: previewImageQuality,
-                      maxWidthDiskCache: previewImageQuality,
-                      memCacheHeight: previewImageQuality,
-                      memCacheWidth: previewImageQuality,
-                      errorWidget: (context, url, error) => Image.file(
-                        File(image ?? ""),
-                        fit: fit ?? BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => isProfileImage == false
-                            ? PostImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder)
-                            : ProfileImagePlaceHolder(isShowPlaceHolder: isShowPlaceHolder),
-                      ),
-                    )
-                  : Image.file(
-                      File(image ?? ""),
-                      fit: fit ?? BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => isProfileImage == false
-                          ? PostImagePlaceHolder(
-                              isShowPlaceHolder: isShowPlaceHolder,
-                              padding: placeHolderPadding,
-                            )
-                          : ProfileImagePlaceHolder(
-                              isShowPlaceHolder: isShowPlaceHolder,
-                              padding: placeHolderPadding,
-                            ),
-                    ),
-              Visibility(
-                visible: isBanned ?? false,
-                child: BlurryContainer(
-                  blur: 10,
-                  borderRadius: BorderRadius.zero,
-                  color: AppColor.black.withValues(alpha: 0.3),
-                  child: Offstage(),
-                ),
-              )
-            ],
-          )
-        : isProfileImage == false
-            ? PostImagePlaceHolder(
-                isShowPlaceHolder: isShowPlaceHolder,
-                padding: placeHolderPadding,
-              )
-            : ProfileImagePlaceHolder(
-                isShowPlaceHolder: isShowPlaceHolder,
-                padding: placeHolderPadding,
+    if (cleanImage.isEmpty) {
+      return fallbackPlaceholder;
+    }
+
+    Widget imageWidget = (cleanImage.startsWith("http://") || cleanImage.startsWith("https://"))
+        ? CachedNetworkImage(
+            imageUrl: cleanImage,
+            fit: fit ?? BoxFit.cover,
+            placeholder: (context, url) => fallbackPlaceholder,
+            errorWidget: (context, url, error) {
+              Utils.showLog("❌ CustomPreviewImage error on $url => $error. Falling back to Image.network.");
+              return Image.network(
+                cleanImage,
+                fit: fit ?? BoxFit.cover,
+                errorBuilder: (context, error2, stack) => fallbackPlaceholder,
               );
+            },
+          )
+        : Image.file(
+            File(cleanImage),
+            fit: fit ?? BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => fallbackPlaceholder,
+          );
+
+    if (isBanned == true) {
+      return Stack(
+        fit: StackFit.expand,
+        children: [
+          imageWidget,
+          BlurryContainer(
+            blur: 10,
+            borderRadius: BorderRadius.zero,
+            color: AppColor.black.withValues(alpha: 0.3),
+            child: const Offstage(),
+          ),
+        ],
+      );
+    }
+    return imageWidget;
   }
 }
 
@@ -381,14 +269,14 @@ class PostImagePlaceHolder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return isShowPlaceHolder == false
-        ? Offstage()
+        ? const Offstage()
         : Center(
-            child: Container(
-              padding: padding,
+            child: Padding(
+              padding: padding ?? const EdgeInsets.all(0),
               child: Image.asset(
                 AppAsset.icImagePlaceHolder,
-                height: size ?? 100,
-                width: size ?? 100,
+                color: AppColor.colorTextGrey,
+                width: size ?? 45,
               ),
             ),
           );
@@ -396,23 +284,22 @@ class PostImagePlaceHolder extends StatelessWidget {
 }
 
 class ProfileImagePlaceHolder extends StatelessWidget {
-  const ProfileImagePlaceHolder({super.key, this.size, this.isShowPlaceHolder, this.padding});
+  const ProfileImagePlaceHolder({super.key, this.isShowPlaceHolder, this.padding});
 
-  final double? size;
   final bool? isShowPlaceHolder;
   final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
     return isShowPlaceHolder == false
-        ? Offstage()
-        : Container(
-            padding: padding,
-            child: Image.asset(
-              AppAsset.icProfilePlaceHolder,
-              fit: BoxFit.cover,
-              height: size,
-              width: size,
+        ? const Offstage()
+        : Center(
+            child: Padding(
+              padding: padding ?? const EdgeInsets.all(0),
+              child: Image.asset(
+                AppAsset.icProfilePlaceHolder,
+                fit: BoxFit.cover,
+              ),
             ),
           );
   }
@@ -430,29 +317,40 @@ class PreviewGiftWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Utils.showLog("Gift Type => $type **** Gift Url => $url");
+    final cleanUrl = Utils.resolveUrl(url);
+    final cleanThumb = Utils.resolveUrl(thumbnailUrl);
 
-    return (url?.trim().isNotEmpty ?? false) && type != null
-        ? type == 3 && isShowThumbnail == true
-            ? CachedNetworkImage(
-                imageUrl: ((thumbnailUrl ?? "")),
-                fit: fit,
-                errorWidget: (context, url, error) => Offstage(),
-              )
-            : type == 3
-                ? SizedBox(
-                    height: MediaQuery.of(context).size.height,
-                    width: MediaQuery.of(context).size.width,
-                    child: CustomSVGAPlayer(
-                      giftUrl: (url ?? ""),
-                      callBack: whenCompleteSVGA,
-                    ),
-                  )
-                : CachedNetworkImage(
-                    imageUrl: (url ?? ""),
-                    fit: fit,
-                    errorWidget: (context, url, error) => Offstage(),
-                  )
-        : Offstage();
+    if (cleanUrl.isEmpty || type == null) return const Offstage();
+
+    if (type == 3 && isShowThumbnail == true) {
+      return CachedNetworkImage(
+        imageUrl: cleanThumb,
+        fit: fit,
+        errorWidget: (context, url, error) => Image.network(
+          cleanThumb,
+          fit: fit,
+          errorBuilder: (context, error2, stack) => const Offstage(),
+        ),
+      );
+    } else if (type == 3) {
+      return SizedBox(
+        height: MediaQuery.of(context).size.height,
+        width: MediaQuery.of(context).size.width,
+        child: CustomSVGAPlayer(
+          giftUrl: cleanUrl,
+          callBack: whenCompleteSVGA,
+        ),
+      );
+    } else {
+      return CachedNetworkImage(
+        imageUrl: cleanUrl,
+        fit: fit,
+        errorWidget: (context, url, error) => Image.network(
+          cleanUrl,
+          fit: fit,
+          errorBuilder: (context, error2, stack) => const Offstage(),
+        ),
+      );
+    }
   }
 }

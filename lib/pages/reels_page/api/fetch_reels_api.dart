@@ -8,6 +8,8 @@ class FetchReelsApi {
   static int startPagination = 0;
   static int limitPagination = 20;
 
+  // No hardcoded fallback reels — always fetch live data from server.
+
   static Future<FetchReelsModel?> callApi({required String loginUserId, required String videoId}) async {
     Utils.showLog("Get Reels Api Calling... ");
 
@@ -21,19 +23,24 @@ class FetchReelsApi {
     final headers = {"key": Api.secretKey};
 
     try {
-      var response = await http.get(uri, headers: headers);
+      var response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
 
         Utils.showLog("Get Reels Api Response => ${response.body}");
-        return FetchReelsModel.fromJson(jsonResponse);
+        final model = FetchReelsModel.fromJson(jsonResponse);
+        if (model.data != null && model.data!.isNotEmpty) {
+          return model;
+        }
       } else {
         Utils.showLog("Get Reels Api StateCode Error");
       }
     } catch (error) {
       Utils.showLog("Get Reels Api Error => $error");
     }
+
+    // No fallback — show real data only; return null so UI shows empty state
     return null;
   }
 }
