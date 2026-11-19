@@ -2,22 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shortie/pages/bottom_bar_page/controller/bottom_bar_controller.dart';
 import 'package:shortie/pages/feed_page/controller/feed_controller.dart';
+import 'package:shortie/pages/feed_page/widget/feed_section_widget.dart';
 import 'package:shortie/pages/feed_page/widget/feed_widget.dart';
 import 'package:shortie/pages/story_page/widget/user_story_list_widget.dart';
 import 'package:shortie/shimmer/feed_shimmer_ui.dart';
+import 'package:shortie/shimmer/stream_shimmer_ui.dart';
 import 'package:shortie/ui/no_data_found_ui.dart';
 import 'package:shortie/utils/color.dart';
 
-class FeedView extends GetView<FeedController> {
+class FeedView extends StatelessWidget {
   const FeedView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    controller.init();
+    if (!Get.isRegistered<FeedController>()) {
+      Get.put(FeedController(), permanent: true);
+    }
+    final BottomBarController bottomBarController = Get.isRegistered<BottomBarController>()
+        ? Get.find<BottomBarController>()
+        : Get.put(BottomBarController(), permanent: true);
+
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
-        Get.find<BottomBarController>().onChangeBottomBar(0);
+        bottomBarController.onChangeBottomBar(0);
       },
       child: Scaffold(
         appBar: AppBar(
@@ -30,68 +38,140 @@ class FeedView extends GetView<FeedController> {
           flexibleSpace: const FeedAppBarView(),
         ),
         body: GetBuilder<FeedController>(
-          id: "onGetPost",
-          builder: (controller) => controller.isLoadingPost
-              ? FeedShimmerUi()
-              : RefreshIndicator(
-                  color: AppColor.primary,
-                  onRefresh: () async => await controller.init(),
-                  child: SingleChildScrollView(
-                    controller: controller.scrollController,
-                    physics: AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      children: [
-                        UserStoryListWidget(),
-                        controller.mainPost.isEmpty
-                            ? SizedBox(height: (Get.width), child: const NoDataFoundUi(iconSize: 160, fontSize: 19))
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                itemCount: controller.mainPost.length,
-                                physics: NeverScrollableScrollPhysics(),
-                                itemBuilder: (context, index) {
-                                  final post = controller.mainPost[index];
-
-                                  debugPrint("Post index: $index, Post ID: ${post.id}");
-
-                                  for (var i = 0; i < (post.userImage?.length ?? 0); i++) {
-                                    debugPrint("Image[$i]: ${post.userImage?[i]}");
-                                  }
-
-                                  return PostView(
-                                    id: post.id ?? "",
-                                    userId: post.userId ?? "",
-                                    profileImage: post.userImage ?? "",
-                                    postImages: post.postImage ?? [],
-                                    title: post.name ?? "",
-                                    subTitle: post.userName ?? "",
-                                    isLike: post.isLike ?? false,
-                                    isFollow: post.isFollow ?? false,
-                                    isVerified: post.isVerified ?? false,
-                                    description: post.caption ?? "",
-                                    hastTag: post.hashTag ?? [],
-                                    time: post.time ?? "",
-                                    likes: post.totalLikes ?? 0,
-                                    comments: post.totalComments ?? 0,
-                                    isFakeUser: post.isFake ?? false,
-                                    isProfileImageBanned: post.isProfileImageBanned ?? false,
-                                    userStory: post.stories ?? [],
-                                  );
-                                },
-                              ),
-                        // SizedBox(height: AppConstant.bottomBarSize.toDouble()), // Use For Last Element Proper Show...
-                      ],
-                    ),
-                  ),
-                ),
+          id: "onSectionChange",
+          builder: (controller) => RefreshIndicator(
+            color: AppColor.primary,
+            onRefresh: () async => await controller.init(),
+            child: SingleChildScrollView(
+              controller: controller.scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  const UserStoryListWidget(),
+                  const FeedSectionTabBar(),
+                  _buildSectionContent(controller),
+                ],
+              ),
+            ),
+          ),
         ),
         bottomNavigationBar: GetBuilder<FeedController>(
           id: "onPagination",
           builder: (controller) => Visibility(
             visible: controller.isPaginationLoading,
-            child: LinearProgressIndicator(color: AppColor.primary),
+            child: const LinearProgressIndicator(color: AppColor.primary),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionContent(FeedController controller) {
+    if (controller.selectedSection == 0) {
+      // ── Popular Section ──────────────────────────────────────────────────
+      return GetBuilder<FeedController>(
+        id: "onGetPopular",
+        builder: (c) {
+          if (c.isLoadingPopular) {
+            return const StreamShimmerUi();
+          }
+          if (c.popularUsers.isEmpty) {
+            return SizedBox(
+              height: Get.width,
+              child: const NoDataFoundUi(iconSize: 140, fontSize: 18, text: "No popular users found"),
+            );
+          }
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: 220,
+            ),
+            itemCount: c.popularUsers.length,
+            itemBuilder: (context, index) {
+              return PopularUserCard(user: c.popularUsers[index]);
+            },
+          );
+        },
+      );
+    } else if (controller.selectedSection == 2) {
+      // ── PK Matches Section ───────────────────────────────────────────────
+      return GetBuilder<FeedController>(
+        id: "onGetPkMatches",
+        builder: (c) {
+          if (c.isLoadingPkMatches) {
+            return const StreamShimmerUi();
+          }
+          if (c.pkMatches.isEmpty) {
+            return SizedBox(
+              height: Get.width,
+              child: const NoDataFoundUi(iconSize: 140, fontSize: 18, text: "No active PK matches found"),
+            );
+          }
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(12),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              mainAxisExtent: 220,
+            ),
+            itemCount: c.pkMatches.length,
+            itemBuilder: (context, index) {
+              return PkMatchCard(liveData: c.pkMatches[index]);
+            },
+          );
+        },
+      );
+    }
+
+    // ── Default Feed Section ─────────────────────────────────────────────
+    return GetBuilder<FeedController>(
+      id: "onGetPost",
+      builder: (c) {
+        if (c.isLoadingPost) {
+          return const FeedShimmerUi();
+        }
+        if (c.mainPost.isEmpty) {
+          return SizedBox(
+            height: Get.width,
+            child: const NoDataFoundUi(iconSize: 160, fontSize: 19),
+          );
+        }
+        return ListView.builder(
+          shrinkWrap: true,
+          itemCount: c.mainPost.length,
+          physics: const NeverScrollableScrollPhysics(),
+          itemBuilder: (context, index) {
+            final post = c.mainPost[index];
+            return PostView(
+              id: post.id ?? "",
+              userId: post.userId ?? "",
+              profileImage: post.userImage ?? "",
+              postImages: post.postImage ?? [],
+              title: post.name ?? "",
+              subTitle: post.userName ?? "",
+              isLike: post.isLike ?? false,
+              isFollow: post.isFollow ?? false,
+              isVerified: post.isVerified ?? false,
+              description: post.caption ?? "",
+              hastTag: post.hashTag ?? [],
+              time: post.time ?? "",
+              likes: post.totalLikes ?? 0,
+              comments: post.totalComments ?? 0,
+              isFakeUser: post.isFake ?? false,
+              isProfileImageBanned: post.isProfileImageBanned ?? false,
+              userStory: post.stories ?? [],
+            );
+          },
+        );
+      },
     );
   }
 }

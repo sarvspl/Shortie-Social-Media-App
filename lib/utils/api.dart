@@ -1,6 +1,6 @@
 abstract class Api {
-  static const domain = "localhost:5000"; // Ex:- yourdomain.com
-  static const baseUrl = "http://localhost:5000/"; // Ex:- https://yourdomain.com/
+  static const domain = "connect.sarstage.online"; // Ex:- yourdomain.com
+  static const baseUrl = "https://connect.sarstage.online/api/"; // Ex:- https://yourdomain.com/
   static const secretKey = "5TIvw5cpc0"; // Ex:- ssf45sd1fs5d1sdf1s56165s15sdf1s
   static const folderStructurePath = "Shortie"; // Ex:- Xyz
 
@@ -56,6 +56,8 @@ abstract class Api {
 
   static const editProfile = "${baseUrl}client/user/update";
 
+  static const fetchPopularUsers = "${baseUrl}client/user/getPopularUsers";
+
   static const audioWiseVideos = "${baseUrl}client/video/fetchVideosOfParticularSong";
 
   // >>>>> >>>>> Reels Page Api <<<<< <<<<<
@@ -110,6 +112,7 @@ abstract class Api {
   static const createLiveUser = "${baseUrl}client/liveUser/live";
   static const fetchLiveUser = "${baseUrl}client/liveUser/getliveUserList";
   static const fetchLiveUserListForPk = "${baseUrl}client/liveUser/fetchPkInvitations";
+  static const agoraToken = "${baseUrl}client/agora/getToken";
 
   // >>>>> >>>>> Message Page Api <<<<< <<<<<
 

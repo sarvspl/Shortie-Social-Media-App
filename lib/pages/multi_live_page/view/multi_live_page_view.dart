@@ -13,12 +13,16 @@ import 'package:shortie/custom/custom_shedow_widget.dart';
 import 'package:shortie/main.dart';
 import 'package:shortie/pages/fake_live_page/widget/fake_comments_widget.dart';
 import 'package:shortie/pages/fake_live_page/widget/fake_send_gift_bottom_sheet_widget.dart';
+import 'package:shortie/pages/multi_live_page/bottom_sheet/incoming_multi_live_request_bottom_sheet_widget.dart';
+import 'package:shortie/pages/multi_live_page/bottom_sheet/join_multi_live_request_bottom_sheet_widget.dart';
 import 'package:shortie/pages/multi_live_page/bottom_sheet/invite_user_for_pk_bottom_sheet.dart';
 import 'package:shortie/pages/multi_live_page/bottom_sheet/sending_pk_request_bottom_sheet.dart';
 import 'package:shortie/pages/multi_live_page/controller/multi_live_controller.dart';
 import 'package:shortie/pages/multi_live_page/view/keepalive.dart';
 import 'package:shortie/pages/multi_live_page/widget/HostVideoView.dart';
+import 'package:shortie/pages/stream_page/model/live_user_object_model.dart';
 import 'package:shortie/pages/multi_live_page/widget/gift_animation.dart';
+import 'package:shortie/pages/multi_live_page/widget/modern_pk_battle_widget.dart';
 import 'package:shortie/pages/multi_live_page/widget/pk_animation_dart.dart';
 import 'package:shortie/pages/multi_live_page/widget/pk_top_gift_user_widget.dart';
 import 'package:shortie/pages/multi_live_page/widget/rank_slider_ui.dart';
@@ -323,7 +327,7 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
     );
   }
 
-  // Single host live view (Type 1)
+  // Single host live view (Type 1 & Multi-Live Type 2)
   Widget _buildSingleLiveView(MultiLiveController logic) {
     // if (logic.isHostCameraOn) {
     return Obx(
@@ -344,6 +348,55 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                       width: Get.width,
                       height: Get.height,
                     ),
+
+              // Co-Host video tiles overlay
+              if (logic.joinMultiLiveUsers.isNotEmpty)
+                Positioned(
+                  right: 12,
+                  top: 140,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: logic.joinMultiLiveUsers.map((coHost) {
+                      final bool isMe = coHost.userId == Database.loginUserId;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        width: Get.width * 0.28,
+                        height: 140,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColor.primary, width: 1.5),
+                          color: Colors.black,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: isMe
+                            ? (logic.coHostLocalView ??
+                                const Center(
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                ))
+                            : HostVideoView(
+                                streamID: coHost.agoraUid ?? "${coHost.userId}_call",
+                                height: 140,
+                                coHost: Requested(
+                                  userId: coHost.userId,
+                                  name: coHost.name,
+                                  userName: coHost.userName,
+                                  image: coHost.image,
+                                  coin: coHost.coin,
+                                  isCameraEnabled: coHost.isCameraEnabled ?? true,
+                                ),
+                                isMute: coHost.isMute ?? false,
+                              ),
+                      );
+                    }).toList(),
+                  ),
+                ),
             ],
           ),
         ),
@@ -437,75 +490,28 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
     );
   }
 
-  // PK live view (Type 3)
+  // PK live view (Type 3) - Modernized to match user reference image
   Widget _buildPkLiveView(MultiLiveController logic) {
     return Column(
-      // mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SizedBox(
-          height: 110,
-        ),
+        const SizedBox(height: 90),
+        _buildPkBattleView(logic),
         GetBuilder<MultiLiveController>(
           id: "onUpdateRank",
-          builder: (controller) => SizedBox(
-            width: Get.width,
-            child: CustomRankSliderWidget(
-              height: 20,
-              rank1: logic.host2Rank,
-              rank2: logic.host1Rank,
-              width: Get.width,
+          builder: (controller) => GetBuilder<MultiLiveController>(
+            id: "onChangePkTime",
+            builder: (c) => ModernPkScoreBarWidget(
+              rank1: logic.host1Rank,
+              rank2: logic.host2Rank,
+              pkTimeSeconds: logic.pkCountTime,
+              host1Gifters: logic.host1TopGiftUsers,
+              host2Gifters: logic.host2TopGiftUsers,
             ),
           ),
         ),
-        _buildPkBattleView(logic),
-        SizedBox(height: 10),
-        SuperTimerShow()
+        const SizedBox(height: 6),
+        SuperTimerShow(),
       ],
-    );
-  }
-
-  Widget SuperTimerShow() {
-    return GetBuilder<MultiLiveController>(
-      id: 'onUpdateMultiLive',
-      builder: (logic) => Container(
-        child: logic.pkUntilSuperTime > 0
-            // && logic.isHost == false && logic.isCoHost == false
-            ? GiftingReminder(
-                creatorName: logic.host1Name,
-                timeUntilEvent: Duration(seconds: logic.pkUntilSuperTime ?? 0),
-              )
-            : Visibility(
-                visible: logic.isOnSuperTimer.value,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: AppColor.primaryLinearGradient,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        "X ${Utils.isShowMultiplier} ${EnumLocal.txtGiftingPoints.name.tr}",
-                        style: AppFontStyle.styleW800(AppColor.white, 14),
-                      ),
-                      10.width,
-                      Container(
-                        height: 15,
-                        width: 1,
-                        color: AppColor.white,
-                      ),
-                      10.width,
-                      Text(
-                        logic.onConvertSecondOnly(logic.pkSuperCountTime),
-                        style: AppFontStyle.styleW800(AppColor.white, 14),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-      ),
     );
   }
 
@@ -515,40 +521,92 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
       alignment: Alignment.center,
       clipBehavior: Clip.none,
       children: [
-        // Host views
+        // Side-by-Side 50/50 Video Feeds with Host Name Badges
         Row(
           children: [
             Expanded(
-              child: !logic.isHostCameraOn
-                  ? _buildOffCameraUserProfile(logic, Get.height / 2.5, Get.width)
-                  : SizedBox(
-                      height: Get.height / 2.5,
-                      child: logic.isHost ? logic.liveScreen : logic.remoteView,
+              child: Stack(
+                children: [
+                  !logic.isHostCameraOn
+                      ? _buildOffCameraUserProfile(logic, Get.height / 2.7, Get.width)
+                      : SizedBox(
+                          height: Get.height / 2.7,
+                          child: logic.isHost ? logic.liveScreen : logic.remoteView,
+                        ),
+                  // Host 1 Pink Name Badge on top-left of video
+                  Positioned(
+                    top: 8,
+                    left: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFFE91E63), Color(0xFFFF4081)]),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4),
+                        ],
+                      ),
+                      child: Text(
+                        logic.name.isNotEmpty ? logic.name : "Host 1",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppFontStyle.styleW700(Colors.white, 10),
+                      ),
                     ),
+                  ),
+                ],
+              ),
             ),
+            Container(width: 1.5, color: Colors.black),
             Expanded(
-              child: SizedBox(
-                height: Get.height / 2.5,
-                child: PkHostVideoView(
-                  streamID: logic.host2ChannelId,
-                  height: Get.height * 0.4,
-                  isMute: false,
-                ),
+              child: Stack(
+                children: [
+                  SizedBox(
+                    height: Get.height / 2.7,
+                    child: PkHostVideoView(
+                      streamID: logic.host2ChannelId,
+                      height: Get.height / 2.7,
+                      isMute: false,
+                    ),
+                  ),
+                  // Host 2 Cyan Name Badge on top-right of video
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(colors: [Color(0xFF00E5FF), Color(0xFF0091EA)]),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 4),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              logic.host2Name.isNotEmpty ? logic.host2Name : "Opponent",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppFontStyle.styleW700(Colors.white, 10),
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Icon(Icons.mic, color: Colors.white, size: 11),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
 
-        // PK Timer
-        Positioned(
-          top: 0,
-          child: PkTimerWidget(),
-        ),
-
-        // PK Countdown animation
+        // PK Countdown animation (when under 10 seconds)
         _buildPkCountdown(),
-
-        Positioned(bottom: 0, child: PkTopGiftUserWidget()),
         _buildSuperPkAnimations(),
       ],
     );
@@ -722,6 +780,51 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
             );
           },
         ),
+        GetBuilder<MultiLiveController>(
+          id: "onUpdateMultiLive",
+          builder: (controller) {
+            return Visibility(
+              visible: (controller.liveUserObject?.isPkMode == false && controller.isHost),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CircleIconButtonUi(
+                      circleSize: 38,
+                      iconSize: 22,
+                      gradient: AppColor.primaryLinearGradient,
+                      icon: AppAsset.icGuestLive,
+                      iconColor: AppColor.white,
+                      callback: () {
+                        controller.onChangeRedDot(false);
+                        IncomingMultiLiveRequestBottomSheetWidget.show();
+                      },
+                    ),
+                    GetBuilder<MultiLiveController>(
+                      id: "onChangeRedDot",
+                      builder: (logic) => (logic.isShowRedDot || logic.multiLiveRequestedList.isNotEmpty)
+                          ? Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
         10.height,
         controller.isHost || controller.isCoHost
             ? 0.height
@@ -775,6 +878,13 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                             padding: const EdgeInsets.only(top: 8),
                             itemBuilder: (context, index) {
                               final data = SocketServices.mainLiveComments[index];
+                              if (index % 3 == 0) {
+                                return ModernVipChatBubble(
+                                  userName: data["userName"] ?? "User",
+                                  message: data["commentText"] ?? "",
+                                  userImage: data["userImage"],
+                                );
+                              }
                               return CommentItemUi(
                                 title: data["userName"],
                                 subTitle: data["commentText"],
@@ -793,16 +903,59 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
   }
 
   Widget _buildBottomControls(BuildContext context) {
-    // Get the screen width to provide bounded constraints
-
     return GetBuilder<MultiLiveController>(
       id: "onUpdateMultiLive",
       builder: (controller) {
-        return Container(
-          width: Get.width, // This provides the bounded width constraint
-          padding: EdgeInsets.symmetric(horizontal: 14),
-
-          child: Row(
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Quick Gift Carousel (matching reference image)
+            if (controller.isHost == false)
+              ModernQuickGiftBarWidget(
+                onSendGift: (coins, giftName) {
+                  if ((CustomFetchUserCoin.coin.value == 0 || CustomFetchUserCoin.coin.value < coins)) {
+                    Utils.showToast(EnumLocal.txtYouDonHaveSufficientCoinsToSendTheGift.name.tr);
+                    return;
+                  }
+                  if (controller.liveUserObject?.isPkMode ?? false) {
+                    SocketServices.onPkSendGift(
+                      coin: coins,
+                      giftType: 1,
+                      giftUrl: "",
+                      giftId: "quick_$coins",
+                      senderUserId: Database.loginUserId,
+                      receiverUserIds: [controller.liveUserObject?.userId ?? ""],
+                      liveHistoryId: controller.liveUserObject?.liveHistoryId ?? "",
+                      senderName: Database.fetchLoginUserProfileModel?.user?.name ?? "",
+                      senderImage: Database.fetchLoginUserProfileModel?.user?.image ?? "",
+                      senderUniqueId: Database.fetchLoginUserProfileModel?.user?.uniqueId ?? "",
+                      senderProfilePicBanned: Database.fetchLoginUserProfileModel?.user?.isProfileImageBanned ?? false,
+                    );
+                  } else {
+                    SocketServices.onLiveSendGift(
+                      coin: coins,
+                      giftType: 1,
+                      giftUrl: "",
+                      giftId: "quick_$coins",
+                      senderUserId: Database.loginUserId,
+                      receiverUserId: [controller.liveUserObject?.userId ?? ""],
+                      liveHistoryId: controller.liveUserObject?.liveHistoryId ?? "",
+                      svgaUrl: '',
+                      senderUserName: '',
+                      liveUserObjId: '',
+                      senderName: Database.fetchLoginUserProfileModel?.user?.name ?? "",
+                      senderImage: Database.fetchLoginUserProfileModel?.user?.image ?? "",
+                      senderUniqueId: Database.fetchLoginUserProfileModel?.user?.uniqueId ?? "",
+                      senderProfilePicBanned: Database.fetchLoginUserProfileModel?.user?.isProfileImageBanned ?? false,
+                    );
+                  }
+                  Utils.showToast("Sent $giftName to Host!");
+                },
+              ),
+            Container(
+              width: Get.width, // This provides the bounded width constraint
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: Row(
             children: [
               Expanded(
                 child: GetBuilder<MultiLiveController>(
@@ -912,6 +1065,40 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
               ),
 
               GetBuilder<MultiLiveController>(
+                id: "onUpdateMultiLive",
+                builder: (logic) {
+                  bool isUserInRequestedList = logic.requestedList?.any((element) => element.userId == Database.loginUserId) ?? false;
+                  bool isUserCoHost = logic.joinMultiLiveUsers.any((element) => element.userId == Database.loginUserId && element.isAccepted == true);
+
+                  return Visibility(
+                    visible: logic.isHost == false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: LabeledCircleIconButton(
+                        label: isUserCoHost ? "Leave Seat" : "Co-Host",
+                        circleSize: 50,
+                        iconSize: 26,
+                        iconColor: AppColor.white,
+                        color: isUserCoHost
+                            ? Colors.red.withValues(alpha: 0.6)
+                            : isUserInRequestedList
+                                ? AppColor.primary.withValues(alpha: 0.6)
+                                : AppColor.black.withValues(alpha: 0.3),
+                        icon: isUserCoHost ? AppAsset.icClose : AppAsset.icGuestLive,
+                        callback: () {
+                          if (isUserCoHost) {
+                            logic.onLeftMultiLiveOnSocket();
+                          } else {
+                            JoinMultiLiveRequestBottomSheetWidget.show();
+                          }
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              GetBuilder<MultiLiveController>(
                 id: "onSwitchMic",
                 builder: (logic) {
                   bool isUserInRequestedList = logic.requestedList?.any((element) => element.userId == Database.loginUserId) ?? false;
@@ -975,10 +1162,12 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
               ),
             ],
           ),
-        );
-      },
+        ),
+      ],
     );
-  }
+  },
+);
+}
 
   Widget _buildCommentInputArea(BuildContext context) {
     return GetBuilder<MultiLiveController>(

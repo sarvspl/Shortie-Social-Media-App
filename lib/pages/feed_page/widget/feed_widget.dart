@@ -698,11 +698,14 @@ Widget iconView({
   );
 }
 
-class FeedAppBarView extends GetView<FeedController> {
+class FeedAppBarView extends StatelessWidget {
   const FeedAppBarView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final FeedController controller = Get.isRegistered<FeedController>()
+        ? Get.find<FeedController>()
+        : Get.put(FeedController(), permanent: true);
     return SafeArea(
       bottom: false,
       child: Center(
