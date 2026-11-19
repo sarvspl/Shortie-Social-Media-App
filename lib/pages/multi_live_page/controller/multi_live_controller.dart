@@ -970,6 +970,22 @@ class MultiLiveController extends GetxController {
     );
   }
 
+  /// Host can kick / remove any co-host from the live stream
+  Future<void> onRemoveCoHost(String targetUserId) async {
+    if (targetUserId.trim().isEmpty) return;
+    SocketServices().onEmitLeftParticipantOfCallJoin(
+      userId: targetUserId,
+      liveHistoryId: roomID,
+      liveUserObjId: liveUserObjId,
+      isMute: false,
+      position: 0,
+      isCameraEnabled: true,
+    );
+    joinMultiLiveUsers.removeWhere((element) => element.userId == targetUserId);
+    update(["onUpdateMultiLive"]);
+    Utils.showToast("Co-host removed");
+  }
+
   ///================>>>>>>>>>>>>>>>>>>>>>>>> Pk Live <<<<<<<<<<<<<<<<<<<<<<<<<<<<================
 
   /// >>>>>>>>>>>Get Live User List<<<<<<<<<<<
@@ -1211,7 +1227,7 @@ class MultiLiveController extends GetxController {
         } else if (updateType == ZegoUpdateType.Delete) {
           for (final stream in streamList) {
             Utils.showLog("*********** STREAM_DELETED *********** ${stream.streamID}");
-            if (liveUserObject?.isPkMode == true && (stream.streamID == host2ChannelId || host2ChannelId.isNotEmpty)) {
+            if (liveUserObject?.isPkMode == true && host2ChannelId.isNotEmpty && stream.streamID == host2ChannelId) {
               Utils.showLog("PK Stream stopped -> Opponent disconnected");
               handleOpponentDisconnected();
             }

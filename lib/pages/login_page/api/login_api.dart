@@ -76,7 +76,7 @@ class LoginApi {
       if (InternetConnection.isConnect.value) {
         Utils.showLog("Login Api Body => ${body}");
 
-        final response = await http.post(uri, headers: headers, body: body);
+        final response = await http.post(uri, headers: headers, body: body).timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
           Utils.showLog("Login Api Response => ${response.body}");

@@ -52,9 +52,10 @@ class LoginView extends GetView<LoginController> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Image.asset(
-                        AppAsset.icAppIcon,
-                        height: 180,
-                        width: 180,
+                        AppAsset.icAppLogoWhite,
+                        width: Get.width * 0.85,
+                        height: 125,
+                        fit: BoxFit.contain,
                       ),
                       25.height,
                       SizedBox(
@@ -78,67 +79,16 @@ class LoginView extends GetView<LoginController> {
                         style: AppFontStyle.styleW400(AppColor.white, 14),
                       ),
                       20.height,
-                      GestureDetector(
-                        onTap: controller.onQuickLogin,
-                        child: Container(
-                          height: 56,
-                          width: Get.width,
-                          padding: EdgeInsets.symmetric(horizontal: 6),
-                          decoration: BoxDecoration(
-                            gradient: AppColor.primaryLinearGradient,
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                height: 46,
-                                width: 46,
-                                decoration: BoxDecoration(
-                                  color: AppColor.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(child: Image.asset(AppAsset.icQuickLogo, width: 24)),
-                              ),
-                              Expanded(
-                                child: Center(
-                                  child: FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      EnumLocal.txtQuickLogIn.name.tr,
-                                      style: AppFontStyle.styleW600(AppColor.white, 16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 46),
-                            ],
-                          ),
-                        ),
-                      ),
-                      15.height,
-                      Row(
-                        children: [
-                          Expanded(child: Divider(color: AppColor.white.withValues(alpha: 0.15))),
-                          15.width,
-                          Text(
-                            EnumLocal.txtOr.name.tr,
-                            style: AppFontStyle.styleW600(AppColor.white, 12),
-                          ),
-                          15.width,
-                          Expanded(child: Divider(color: AppColor.white.withValues(alpha: 0.15))),
-                        ],
-                      ),
-                      15.height,
                       Row(
                         children: [
                           Expanded(
                             child: GestureDetector(
-                              onTap: controller.onGoogleLogin,
+                              onTap: controller.onQuickLogin,
                               child: Container(
                                 height: 56,
                                 padding: EdgeInsets.symmetric(horizontal: 6),
                                 decoration: BoxDecoration(
-                                  color: AppColor.colorDarkPink,
+                                  gradient: AppColor.primaryLinearGradient,
                                   borderRadius: BorderRadius.circular(30),
                                 ),
                                 child: Row(
@@ -150,14 +100,14 @@ class LoginView extends GetView<LoginController> {
                                         color: AppColor.white,
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Center(child: Image.asset(AppAsset.icGoogleLogo, width: 28)),
+                                      child: Center(child: Image.asset(AppAsset.icQuickLogo, width: 24)),
                                     ),
                                     Expanded(
                                       child: Center(
                                         child: FittedBox(
                                           fit: BoxFit.scaleDown,
                                           child: Text(
-                                            EnumLocal.txtGoogle.name.tr,
+                                            EnumLocal.txtQuickLogIn.name.tr,
                                             style: AppFontStyle.styleW600(AppColor.white, 15),
                                           ),
                                         ),

@@ -193,8 +193,10 @@ class VerificationOtpController extends GetxController {
 
       final user = fetchLoginUserProfileModel?.user;
       final bool hasProfile = (user?.name?.trim().isNotEmpty ?? false) && (user?.userName?.trim().isNotEmpty ?? false);
+      // Fake users created by admin always have profile filled — skip fill profile page
+      final bool isFakeUser = user?.isFake == true;
 
-      if (isNewUser || !hasProfile) {
+      if (!isFakeUser && (isNewUser || !hasProfile)) {
         await Database.onSetIsProfileComplete(false);
         Get.offAllNamed(AppRoutes.fillProfilePage);
       } else {

@@ -39,6 +39,9 @@ class PopularUser {
   int? receivedGift;
   String? countryFlagImage;
   bool? isLive;
+  String? liveUserObjId;
+  String? liveHistoryId;
+  bool? isPkMode;
 
   PopularUser({
     this.id,
@@ -52,10 +55,13 @@ class PopularUser {
     this.receivedGift,
     this.countryFlagImage,
     this.isLive,
+    this.liveUserObjId,
+    this.liveHistoryId,
+    this.isPkMode,
   });
 
   PopularUser.fromJson(dynamic json) {
-    id = json['_id']?.toString();
+    id = json['_id']?.toString() ?? json['userId']?.toString();
     name = json['name'];
     userName = json['userName'];
     image = json['image'];
@@ -66,6 +72,9 @@ class PopularUser {
     receivedGift = json['receivedGift'] is int ? json['receivedGift'] : int.tryParse(json['receivedGift']?.toString() ?? '0');
     countryFlagImage = json['countryFlagImage'];
     isLive = json['isLive'];
+    liveUserObjId = json['liveUserObjId']?.toString();
+    liveHistoryId = json['liveHistoryId']?.toString();
+    isPkMode = json['isPkMode'];
   }
 
   Map<String, dynamic> toJson() {
@@ -81,6 +90,9 @@ class PopularUser {
     map['receivedGift'] = receivedGift;
     map['countryFlagImage'] = countryFlagImage;
     map['isLive'] = isLive;
+    map['liveUserObjId'] = liveUserObjId;
+    map['liveHistoryId'] = liveHistoryId;
+    map['isPkMode'] = isPkMode;
     return map;
   }
 }

@@ -244,19 +244,46 @@ class PopularUserCard extends StatelessWidget {
   }
 
   void _openPkMatch(BuildContext context) {
-    Get.toNamed(AppRoutes.fakeLivePage, arguments: {
-      "isHost": false,
-      "isFollow": false,
-      "roomId": "pk_${user.id ?? "room"}",
-      "userId": user.id ?? "",
-      "userName": user.userName ?? "",
-      "name": user.name ?? "",
-      "image": user.image ?? "",
-      "videoUrl": "",
-      "host2Image": user.image ?? "",
-      "host2VideoUrl": "",
-      "isPkMode": true,
-    });
+    if (user.liveHistoryId != null && user.liveHistoryId!.isNotEmpty) {
+      if (user.isFake == true) {
+        Get.toNamed(AppRoutes.fakeLivePage, arguments: {
+          "isHost": false,
+          "isFollow": false,
+          "roomId": user.liveHistoryId ?? "",
+          "userId": user.id ?? "",
+          "userName": user.userName ?? "",
+          "name": user.name ?? "",
+          "image": user.image ?? "",
+          "videoUrl": "",
+          "host2Image": user.image ?? "",
+          "host2VideoUrl": "",
+          "isPkMode": true,
+        });
+      } else {
+        Get.to(
+          MultiLivePageView(
+            userId: user.id ?? "",
+            liveUserObjId: user.liveUserObjId ?? "",
+            liveHistoryId: user.liveHistoryId ?? "",
+            isHost: false,
+          ),
+        );
+      }
+    } else {
+      Get.toNamed(AppRoutes.fakeLivePage, arguments: {
+        "isHost": false,
+        "isFollow": false,
+        "roomId": "pk_${user.id ?? "room"}",
+        "userId": user.id ?? "",
+        "userName": user.userName ?? "",
+        "name": user.name ?? "",
+        "image": user.image ?? "",
+        "videoUrl": "",
+        "host2Image": user.image ?? "",
+        "host2VideoUrl": "",
+        "isPkMode": true,
+      });
+    }
   }
 }
 

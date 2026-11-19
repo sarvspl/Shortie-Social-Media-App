@@ -149,25 +149,34 @@ class FeedController extends GetxController {
     final model = await FetchPopularUserApi.callApi();
     if (model?.data != null && model!.data!.isNotEmpty) {
       popularUsers.addAll(model.data!);
-    } else if (isReload) {
-      // Fallback: if server has few users with coins, fetch live users or mock popular entries
+    }
+
+    // Also fetch live and PK streamers and append them after popular users
+    try {
       final liveModel = await FetchLiveUserApi.callApi(loginUserId: Database.loginUserId);
-      if (liveModel?.liveUserList != null) {
-        for (final u in liveModel!.liveUserList!) {
-          popularUsers.add(PopularUser(
-            id: u.userId,
-            name: u.name,
-            userName: u.userName,
-            image: u.image,
-            isVerified: u.isVerified,
-            isFake: u.isFake,
-            coin: (u.view ?? 1) * 120,
-            receivedCoin: (u.view ?? 1) * 550,
-            receivedGift: (u.view ?? 1) * 3,
-            isLive: true,
-          ));
+      if (liveModel?.liveUserList != null && liveModel!.liveUserList!.isNotEmpty) {
+        for (final u in liveModel.liveUserList!) {
+          if (!popularUsers.any((p) => p.id == u.userId)) {
+            popularUsers.add(PopularUser(
+              id: u.userId,
+              name: u.name,
+              userName: u.userName,
+              image: u.image ?? u.videoImage,
+              isVerified: u.isVerified,
+              isFake: u.isFake,
+              coin: (u.view ?? 1) * 120,
+              receivedCoin: (u.view ?? 1) * 550,
+              receivedGift: (u.view ?? 1) * 3,
+              isLive: true,
+              liveUserObjId: u.liveUserObjId,
+              liveHistoryId: u.liveHistoryId,
+              isPkMode: u.isPkMode,
+            ));
+          }
         }
       }
+    } catch (e) {
+      Utils.showLog("Error appending live users to popular list: $e");
     }
 
     isLoadingPopular = false;

@@ -13,9 +13,13 @@ import 'package:shortie/utils/utils.dart';
 class InviteUserForMultiLiveBottomSheet {
   static bool isOpenBottomSheet = false;
   static Future<void> show({required BuildContext context, required int postion}) async {
-    // final controller = Get.find<MultiLiveController>();
-    // controller.onGetLiveUserList();
-    SocketServices.liveViewers;
+    final liveController = Get.isRegistered<MultiLiveController>() ? Get.find<MultiLiveController>() : null;
+    if (liveController != null) {
+      final historyId = liveController.roomID.isNotEmpty ? liveController.roomID : (liveController.liveUserObject?.liveHistoryId ?? "");
+      if (historyId.isNotEmpty) {
+        SocketServices.onGetLiveViewers(liveHistoryId: historyId);
+      }
+    }
     isOpenBottomSheet = true;
     await showModalBottomSheet(
       isScrollControlled: true,
@@ -66,21 +70,25 @@ class InviteUserForMultiLiveBottomSheet {
             10.height,
             Expanded(
               child: Obx(
-                () => SocketServices.liveViewers.isEmpty
-                    ? Center(
-                        child: Text(
-                          "Live User Not Available",
-                          style: AppFontStyle.styleW700(AppColor.black, 17),
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: SocketServices.liveViewers.length,
-                        itemBuilder: (context, index) {
-                          final indexData = SocketServices.liveViewers[index];
-                          final targetId = indexData['userId']?.toString() ?? "";
-                          final targetName = indexData['name'] ?? indexData['userName'] ?? "User";
-                          final targetImage = indexData['image'] ?? "";
-                          final controller = Get.find<MultiLiveController>();
+                () {
+                  final viewers = SocketServices.liveViewers
+                      .where((item) => item != null && item['userId']?.toString() != Database.loginUserId)
+                      .toList();
+                  return viewers.isEmpty
+                      ? Center(
+                          child: Text(
+                            "Live User Not Available",
+                            style: AppFontStyle.styleW700(AppColor.black, 17),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: viewers.length,
+                          itemBuilder: (context, index) {
+                            final indexData = viewers[index];
+                            final targetId = indexData['userId']?.toString() ?? "";
+                            final targetName = indexData['name'] ?? indexData['userName'] ?? "User";
+                            final targetImage = indexData['image'] ?? "";
+                            final controller = Get.find<MultiLiveController>();
 
                           return GestureDetector(
                             onTap: () async {
@@ -168,7 +176,8 @@ class InviteUserForMultiLiveBottomSheet {
                             ),
                           );
                         },
-                      ),
+                      );
+                },
               ),
             ),
           ],

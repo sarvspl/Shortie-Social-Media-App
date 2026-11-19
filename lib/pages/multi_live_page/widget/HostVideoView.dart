@@ -542,16 +542,34 @@ class _PkHostVideoViewState extends State<PkHostVideoView> {
   void initState() {
     log("HostVideoView initState");
     _setupStreamListeners();
-    startPlayStream(widget.streamID);
+    if (widget.streamID.trim().isNotEmpty) {
+      startPlayStream(widget.streamID);
+    }
     super.initState();
+  }
+
+  @override
+  void didUpdateWidget(covariant PkHostVideoView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamID != widget.streamID && widget.streamID.trim().isNotEmpty) {
+      log("PkHostVideoView didUpdateWidget: new streamID: ${widget.streamID}");
+      if (isStreamPlaying && oldWidget.streamID.isNotEmpty) {
+        try {
+          ZegoExpressEngine.instance.stopPlayingStream(oldWidget.streamID);
+        } catch (_) {}
+      }
+      startPlayStream(widget.streamID);
+    }
   }
 
   @override
   void dispose() {
     log("PkHostVideoView dispose");
     _removeStreamListeners();
-    if (isStreamPlaying) {
-      ZegoExpressEngine.instance.stopPlayingStream(widget.streamID);
+    if (isStreamPlaying && widget.streamID.trim().isNotEmpty) {
+      try {
+        ZegoExpressEngine.instance.stopPlayingStream(widget.streamID);
+      } catch (_) {}
     }
     super.dispose();
   }
@@ -613,14 +631,20 @@ class _PkHostVideoViewState extends State<PkHostVideoView> {
 
   // Start playing stream (create canvas once and reuse)
   Future<void> startPlayStream(String streamID) async {
+    if (streamID.trim().isEmpty) {
+      log("PkHostVideoView: empty streamID, skipping play");
+      return;
+    }
     try {
       log("Start Play startPlayStream >>>>>>>>>> $streamID");
 
-      setState(() {
-        isStreamInitialized = false;
-        hasStreamError = false;
-        streamError = "";
-      });
+      if (mounted) {
+        setState(() {
+          isStreamInitialized = false;
+          hasStreamError = false;
+          streamError = "";
+        });
+      }
 
       ZegoExpressEngine.instance.setVideoMirrorMode(ZegoVideoMirrorMode.BothMirror);
 
@@ -702,13 +726,61 @@ class _PkHostVideoViewState extends State<PkHostVideoView> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              (controller.isLoading.value == false && remoteView != null)
-                  ? SizedBox.expand(child: remoteView!)
-                  : LoadingUi(color: AppColor.white),
+              if (remoteView != null)
+                SizedBox.expand(child: remoteView!)
+              else
+                _buildOpponentPlaceholder(controller),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildOpponentPlaceholder(MultiLiveController logic) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(color: Colors.black87),
+        if (logic.host2Image.isNotEmpty)
+          PreviewNetworkImageUi(image: logic.host2Image),
+        ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            child: Container(
+              color: Colors.black.withValues(alpha: 0.4),
+              alignment: Alignment.center,
+            ),
+          ),
+        ),
+        Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                height: 70,
+                width: 70,
+                clipBehavior: Clip.hardEdge,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                child: logic.host2Image.isNotEmpty
+                    ? PreviewNetworkImageUi(image: logic.host2Image)
+                    : Container(color: Colors.grey, child: const Icon(Icons.person, color: Colors.white, size: 40)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                logic.host2Name.isNotEmpty ? logic.host2Name : "Opponent",
+                style: AppFontStyle.styleW700(AppColor.white, 13),
+              ),
+              const SizedBox(height: 6),
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

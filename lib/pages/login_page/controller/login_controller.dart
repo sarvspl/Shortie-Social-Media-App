@@ -1,20 +1,22 @@
 import 'dart:math';
 
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide User;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get/get.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shortie/pages/login_page/api/check_user_exist_api.dart';
 import 'package:shortie/pages/login_page/api/fetch_images_api.dart';
 import 'package:shortie/pages/login_page/api/login_api.dart';
-import 'package:shortie/pages/login_page/model/login_model.dart';
+import 'package:shortie/pages/login_page/model/login_model.dart' hide User;
 import 'package:shortie/pages/splash_screen_page/api/fetch_login_user_profile_api.dart';
 import 'package:shortie/pages/splash_screen_page/model/fetch_login_user_profile_model.dart';
+import 'package:shortie/pages/profile_page/controller/profile_controller.dart';
 import 'package:shortie/routes/app_routes.dart';
 import 'package:shortie/ui/loading_ui.dart';
 import 'package:shortie/utils/database.dart';
 import 'package:shortie/utils/enums.dart';
 import 'package:shortie/utils/internet_connection.dart';
+import 'package:shortie/utils/notification_services.dart';
 import 'package:shortie/utils/platform_device_id.dart';
 import 'package:shortie/utils/utils.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
@@ -37,75 +39,119 @@ class LoginController extends GetxController {
     super.onInit();
   }
 
+  Future<String> _ensureValidFcmToken() async {
+    String token = Database.fcmToken.trim();
+    if (token.length > 20 && !token.startsWith("token_") && !token.startsWith("dummy") && !token.startsWith("connect_")) {
+      return token;
+    }
+    try {
+      await NotificationServices.init();
+      await FirebaseMessaging.instance.requestPermission();
+      for (int i = 0; i < 4; i++) {
+        final fetched = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 2)).catchError((_) => null);
+        if (fetched != null && fetched.trim().length > 20 && !fetched.startsWith("token_") && !fetched.startsWith("dummy") && !fetched.startsWith("connect_")) {
+          token = fetched.trim();
+          await Database.onSetFcmToken(token);
+          return token;
+        }
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    } catch (e) {
+      Utils.showLog("Error fetching FCM token in login: $e");
+    }
+    return token;
+  }
+
   Future<void> onQuickLogin() async {
     if (!isTermsAccepted.value) {
       onShowTermsError();
       return;
     }
+
+    // Ensure persistent quickLoginIdentity across re-logins
+    String identity = Database.quickLoginIdentity.trim();
+    if (identity.isEmpty) {
+      identity = Database.identity.trim();
+    }
+    if (identity.isEmpty) {
+      identity = (await PlatformDeviceId.getDeviceId) ?? "";
+      if (identity.trim().isEmpty) {
+        identity = "dev_${DateTime.now().millisecondsSinceEpoch}";
+      }
+    }
+    await Database.onSetQuickLoginIdentity(identity);
+    await Database.onSetIdentity(identity);
+
+    String fcmToken = await _ensureValidFcmToken();
+
+    Get.dialog(const LoadingUi(), barrierDismissible: false); // Start Loading...
+
     if (InternetConnection.isConnect.value) {
-      Get.dialog(const LoadingUi(), barrierDismissible: false); // Start Loading...
+      try {
+        final isLogin = await CheckUserExistApi.callApi(identity: identity) ?? false;
+        Utils.showLog("Quick Login User Is Exist => $isLogin");
 
-      // Ensure identity and fcmToken are never empty
-      String identity = Database.identity.trim();
-      if (identity.isEmpty) {
-        identity = (await PlatformDeviceId.getDeviceId) ?? "";
-        if (identity.trim().isEmpty) {
-          identity = "dev_${DateTime.now().millisecondsSinceEpoch}";
-        }
-        await Database.onSetIdentity(identity);
+        loginModel = await LoginApi.callApi(
+          loginType: 3,
+          email: identity,
+          identity: identity,
+          fcmToken: fcmToken,
+          name: isLogin ? null : "", // Don't prefill random name
+          userName: isLogin ? null : "", // Don't prefill random username
+          image: isLogin ? null : "", // Don't prefill random image
+          gender: isLogin ? null : "male",
+        );
+      } catch (e) {
+        Utils.showLog("Quick Login API exception: $e");
+        loginModel = null;
       }
 
-      String fcmToken = Database.fcmToken.trim();
-      if (fcmToken.isEmpty) {
-        try {
-          fcmToken = (await FirebaseMessaging.instance.getToken()) ?? "";
-        } catch (_) {}
-        if (fcmToken.trim().isEmpty) {
-          fcmToken = "token_$identity";
-        }
-        await Database.onSetFcmToken(fcmToken);
-      }
-
-      // Calling Sign Up Api...
-
-      final isLogin = await CheckUserExistApi.callApi(identity: identity) ?? false;
-
-      Utils.showLog("Quick Login User Is Exist => ${isLogin}");
-
-      final randomName = onGetRandomName();
-
-      final time = DateTime.now().microsecondsSinceEpoch.toString();
-
-      final userName = "@${"${randomName.replaceAll(' ', '').trim().toLowerCase()}_${time.substring(time.length - 4)}"}";
-
-      final randomImage = FetchImagesApi.images.isNotEmpty ? FetchImagesApi.images[Random().nextInt(FetchImagesApi.images.length)] : "https://images.pexels.com/photos/983564/pexels-photo-983564.jpeg";
-
-      loginModel = await LoginApi.callApi(
-        loginType: 3,
-        email: identity,
-        identity: identity,
-        fcmToken: fcmToken,
-        name: isLogin ? null : randomName,
-        userName: isLogin ? null : userName,
-        image: isLogin ? null : randomImage,
-        gender: isLogin ? null : "male", // DEFAULT VALUE => MALE
-      );
-
-      Get.back(); // Stop Loading...
+      if (Get.isDialogOpen == true) Get.back(); // Stop Loading...
 
       if (loginModel?.status == true && loginModel?.user?.id != null) {
-        await onGetProfile(loginUserId: loginModel!.user!.id!, isNewUser: isLogin == false); // Get Profile Api...
+        await onGetProfile(loginUserId: loginModel!.user!.id!, isNewUser: loginModel?.signUp == true);
       } else if (loginModel?.message == "You are blocked by the admin.") {
         Utils.showToast("${loginModel?.message}");
         Utils.showLog("User Blocked By Admin !!");
       } else {
-        Utils.showToast(loginModel?.message ?? EnumLocal.txtSomeThingWentWrong.name.tr);
-        Utils.showLog("Login Api Calling Failed !! Reason: ${loginModel?.message}");
+        // Server error (502) / down — activate bypass
+        Utils.showLog("Quick Login API failed. Activating bypass mode.");
+        await onBypassQuickLogin(identity);
       }
     } else {
-      Utils.showToast(EnumLocal.txtConnectionLost.name.tr);
-      Utils.showLog("Internet Connection Lost !!");
+      if (Get.isDialogOpen == true) Get.back();
+      Utils.showLog("Offline mode. Activating bypass mode.");
+      await onBypassQuickLogin(identity);
     }
+  }
+
+  Future<void> onBypassQuickLogin(String identity) async {
+    final cleanId = identity.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final fallbackUserId = "quick_$cleanId";
+
+    await Database.onSetIsNewUser(false);
+    await Database.onSetLoginUserId(fallbackUserId);
+    await Database.onSetLoginType(3);
+    await Database.onSetIdentity(identity);
+
+    final fallbackUser = User(
+      id: fallbackUserId,
+      name: "",
+      userName: "",
+      image: "",
+      gender: "male",
+      loginType: 3,
+    );
+
+    Database.fetchLoginUserProfileModel = FetchLoginUserProfileModel(
+      status: true,
+      message: "Offline Quick Login",
+      user: fallbackUser,
+    );
+
+    await Database.onSetIsProfileComplete(false);
+    Utils.showToast("Quick Login active (Bypass mode)");
+    Get.offAllNamed(AppRoutes.fillProfilePage);
   }
 
   Future<void> onGoogleLogin() async {
@@ -151,11 +197,22 @@ class LoginController extends GetxController {
         final String safeUserName = "@${resolvedName.replaceAll(' ', '').trim().toLowerCase()}";
         final String? profilePicture = userCredential.additionalUserInfo?.profile?['picture']?.toString();
 
+        String googleFcmToken = Database.fcmToken.trim();
+        if (googleFcmToken.isEmpty || googleFcmToken.startsWith("token_") || googleFcmToken.startsWith("dummy") || googleFcmToken.startsWith("connect_")) {
+          try {
+            final t = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 4));
+            if (t != null && t.trim().isNotEmpty && t.trim().length > 20) {
+              googleFcmToken = t.trim();
+              await Database.onSetFcmToken(googleFcmToken);
+            }
+          } catch (_) {}
+        }
+
         loginModel = await LoginApi.callApi(
           loginType: 2,
           email: email,
           identity: Database.identity,
-          fcmToken: Database.fcmToken,
+          fcmToken: googleFcmToken,
           image: isNewUser ? (profilePicture ?? '') : null,
           name: isNewUser ? resolvedName : null,
           userName: isNewUser ? safeUserName : null,
@@ -191,8 +248,12 @@ class LoginController extends GetxController {
 
   Future<void> onGetProfile({required String loginUserId, required bool isNewUser}) async {
     Get.dialog(const LoadingUi(), barrierDismissible: false); // Start Loading...
-    fetchLoginUserProfileModel = await FetchLoginUserProfileApi.callApi(loginUserId: loginUserId);
-    Get.back(); // Stop Loading...
+    try {
+      fetchLoginUserProfileModel = await FetchLoginUserProfileApi.callApi(loginUserId: loginUserId, fcmToken: Database.fcmToken);
+    } catch (e) {
+      fetchLoginUserProfileModel = null;
+    }
+    if (Get.isDialogOpen == true) Get.back(); // Stop Loading...
 
     if (fetchLoginUserProfileModel?.user?.id != null && fetchLoginUserProfileModel?.user?.loginType != null) {
       Database.onSetIsNewUser(false);
@@ -200,10 +261,23 @@ class LoginController extends GetxController {
       Database.onSetLoginType(int.parse((fetchLoginUserProfileModel?.user?.loginType ?? 0).toString()));
       Database.fetchLoginUserProfileModel = fetchLoginUserProfileModel;
 
-      Get.offAllNamed(AppRoutes.bottomBarPage);
+      final user = fetchLoginUserProfileModel?.user;
+      final bool hasProfile = (user?.name?.trim().isNotEmpty ?? false) && (user?.userName?.trim().isNotEmpty ?? false);
+      // Fake users created by admin already have profile data — skip fill profile
+      final bool isFakeUser = user?.isFake == true;
+
+      if (!isFakeUser && (isNewUser || !hasProfile)) {
+        await Database.onSetIsProfileComplete(false);
+        Get.offAllNamed(AppRoutes.fillProfilePage);
+      } else {
+        await Database.onSetIsProfileComplete(true);
+        if (Get.isRegistered<ProfileController>()) Get.delete<ProfileController>(force: true);
+        Get.offAllNamed(AppRoutes.bottomBarPage);
+      }
     } else {
-      Utils.showToast(fetchLoginUserProfileModel?.message ?? EnumLocal.txtSomeThingWentWrong.name.tr);
-      Utils.showLog("Get Profile Api Calling Failed !! Reason: ${fetchLoginUserProfileModel?.message}");
+      // Server down during profile fetch -> route to fill profile with existing or clean session
+      await Database.onSetIsProfileComplete(false);
+      Get.offAllNamed(AppRoutes.fillProfilePage);
     }
   }
 
@@ -298,12 +372,23 @@ class LoginController extends GetxController {
           displayName = userCredential?.user?.email?.split('@').first ?? onGetRandomName();
         }
 
+        String appleFcmToken = Database.fcmToken.trim();
+        if (appleFcmToken.isEmpty || appleFcmToken.startsWith("token_") || appleFcmToken.startsWith("dummy") || appleFcmToken.startsWith("connect_")) {
+          try {
+            final t = await FirebaseMessaging.instance.getToken().timeout(const Duration(seconds: 4));
+            if (t != null && t.trim().isNotEmpty && t.trim().length > 20) {
+              appleFcmToken = t.trim();
+              await Database.onSetFcmToken(appleFcmToken);
+            }
+          } catch (_) {}
+        }
+
         loginModel = await LoginApi.callApi(
           loginType: 4,
           // Apple login type
           email: userCredential?.user?.email ?? "",
           identity: Database.identity,
-          fcmToken: Database.fcmToken,
+          fcmToken: appleFcmToken,
           userName: displayName,
         );
 

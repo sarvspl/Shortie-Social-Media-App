@@ -349,50 +349,73 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                       height: Get.height,
                     ),
 
-              // Co-Host video tiles overlay
+              // Co-Host video tiles overlay (positioned below side controls so buttons don't block video)
               if (logic.joinMultiLiveUsers.isNotEmpty)
                 Positioned(
                   right: 12,
-                  top: 140,
+                  top: 220,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: logic.joinMultiLiveUsers.map((coHost) {
                       final bool isMe = coHost.userId == Database.loginUserId;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        width: Get.width * 0.28,
-                        height: 140,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColor.primary, width: 1.5),
-                          color: Colors.black,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.3),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: isMe
-                            ? (logic.coHostLocalView ??
-                                const Center(
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                ))
-                            : HostVideoView(
-                                streamID: coHost.agoraUid ?? "${coHost.userId}_call",
-                                height: 140,
-                                coHost: Requested(
-                                  userId: coHost.userId,
-                                  name: coHost.name,
-                                  userName: coHost.userName,
-                                  image: coHost.image,
-                                  coin: coHost.coin,
-                                  isCameraEnabled: coHost.isCameraEnabled ?? true,
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            width: Get.width * 0.32,
+                            height: 130,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColor.primary, width: 1.5),
+                              color: Colors.black,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
                                 ),
-                                isMute: coHost.isMute ?? false,
+                              ],
+                            ),
+                            child: isMe
+                                ? (logic.coHostLocalView ??
+                                    const Center(
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                    ))
+                                : HostVideoView(
+                                    streamID: coHost.agoraUid ?? "${coHost.userId}_call",
+                                    height: 130,
+                                    coHost: Requested(
+                                      userId: coHost.userId,
+                                      name: coHost.name,
+                                      userName: coHost.userName,
+                                      image: coHost.image,
+                                      coin: coHost.coin,
+                                      isCameraEnabled: coHost.isCameraEnabled ?? true,
+                                    ),
+                                    isMute: coHost.isMute ?? false,
+                                  ),
+                          ),
+                          // Kick / remove button for host
+                          if (logic.isHost && !isMe)
+                            Positioned(
+                              top: 4,
+                              right: 4,
+                              child: GestureDetector(
+                                onTap: () => logic.onRemoveCoHost(coHost.userId ?? ""),
+                                child: Container(
+                                  padding: const EdgeInsets.all(3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.85),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 1),
+                                  ),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
                               ),
+                            ),
+                        ],
                       );
                     }).toList(),
                   ),
@@ -522,7 +545,7 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
         child: logic.pkUntilSuperTime > 0
             ? GiftingReminder(
                 creatorName: logic.host1Name,
-                timeUntilEvent: Duration(seconds: logic.pkUntilSuperTime ?? 0),
+                timeUntilEvent: Duration(seconds: logic.pkUntilSuperTime),
               )
             : Visibility(
                 visible: logic.isOnSuperTimer.value,
@@ -1636,10 +1659,12 @@ class _MultiLivePageViewState extends State<MultiLivePageView> with WidgetsBindi
                 children: [
                   Image.asset(AppAsset.icView, width: 16),
                   8.width,
-                  Text(
-                    CustomFormatNumber.convert(SocketServices.userWatchCount.value),
-                    maxLines: 1,
-                    style: AppFontStyle.styleW700(AppColor.white, 12),
+                  Obx(
+                    () => Text(
+                      CustomFormatNumber.convert(SocketServices.userWatchCount.value),
+                      maxLines: 1,
+                      style: AppFontStyle.styleW700(AppColor.white, 12),
+                    ),
                   ),
                 ],
               ),

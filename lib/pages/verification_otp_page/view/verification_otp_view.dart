@@ -69,11 +69,7 @@ class VerificationOtpView extends GetView<VerificationOtpController> {
                         cursorColor: AppColor.primary,
                         focusedBorderColor: AppColor.primary,
                         showFieldAsBox: true,
-                        onCodeChanged: (String code) {
-                          if (code.isEmpty) {
-                            controller.otpController.clear();
-                          }
-                        },
+                        onCodeChanged: (String code) => controller.otpController.text = code,
                         onSubmit: (String otpCode) => controller.otpController.text = otpCode,
                       ),
                     ),

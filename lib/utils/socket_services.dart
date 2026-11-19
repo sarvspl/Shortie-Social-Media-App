@@ -819,6 +819,15 @@ class SocketServices {
     }
   }
 
+  /// Request current viewer list from server (used when host opens Invite Multi-Live sheet)
+  static void onGetLiveViewers({required String liveHistoryId}) {
+    if (liveHistoryId.trim().isNotEmpty && socket != null && socket!.connected) {
+      final data = jsonEncode({"liveHistoryId": liveHistoryId});
+      socket?.emit("getLiveViewers", data);
+      Utils.showLog("SOCKET LIVE EVENT => Socket Emit => getLiveViewers => $data");
+    }
+  }
+
   static Future<void> onLessView({required String loginUserId, required String liveHistoryId}) async {
     if (loginUserId.trim().isNotEmpty && liveHistoryId.trim().isNotEmpty) {
       final data = jsonEncode({"userId": loginUserId, "liveHistoryId": liveHistoryId});
