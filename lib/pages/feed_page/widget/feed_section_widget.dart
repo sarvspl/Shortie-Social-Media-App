@@ -105,9 +105,13 @@ class PopularUserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final int score = (user.receivedCoin ?? 0) > 0
-        ? user.receivedCoin!
-        : ((user.receivedGift ?? 0) > 0 ? (user.receivedGift! * 250) : (user.coin ?? 1200));
+    final bool isPk = user.isPkMode == true;
+    final bool isLive = user.isLive == true && (user.liveHistoryId?.isNotEmpty ?? false);
+
+    final int displayValue = (user.receivedGift ?? 0) > 0
+        ? user.receivedGift!
+        : ((user.receivedCoin ?? 0) > 0 ? user.receivedCoin! : (user.coin ?? 0));
+    final String metricLabel = (user.receivedGift ?? 0) > 0 ? "🎁" : "🪙";
 
     return GestureDetector(
       onTap: () => _openPkMatch(context),
@@ -135,14 +139,18 @@ class PopularUserCard extends StatelessWidget {
               fit: BoxFit.cover,
             ),
 
-            // Top Badges (PK on left, Rising Star on right)
+            // Top Status Badge (PK LIVE vs LIVE vs Popular)
             Positioned(
               top: 8,
               left: 8,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(colors: [Color(0xFFFF5252), Color(0xFFFF7A00)]),
+                  gradient: isPk
+                      ? const LinearGradient(colors: [Color(0xFFFF1744), Color(0xFFFF5252)])
+                      : (isLive
+                          ? const LinearGradient(colors: [Color(0xFF8E24AA), Color(0xFFD81B60)])
+                          : const LinearGradient(colors: [Color(0xFF00C853), Color(0xFF64DD17)])),
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 4),
@@ -151,33 +159,41 @@ class PopularUserCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.flash_on, color: Colors.white, size: 11),
-                    const SizedBox(width: 2),
-                    Text("PK", style: AppFontStyle.styleW800(Colors.white, 10)),
+                    Icon(
+                      isPk ? Icons.flash_on : (isLive ? Icons.sensors : Icons.trending_up),
+                      color: Colors.white,
+                      size: 11,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      isPk ? "PK LIVE" : (isLive ? "LIVE" : "Popular"),
+                      style: AppFontStyle.styleW800(Colors.white, 10),
+                    ),
                   ],
                 ),
               ),
             ),
 
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00B0FF).withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star, color: Colors.amber, size: 11),
-                    const SizedBox(width: 3),
-                    Text("Rising Star", style: AppFontStyle.styleW700(Colors.white, 9)),
-                  ],
+            if (user.isVerified ?? false)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00B0FF).withValues(alpha: 0.85),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.verified, color: Colors.white, size: 11),
+                      const SizedBox(width: 3),
+                      Text("Verified", style: AppFontStyle.styleW700(Colors.white, 9)),
+                    ],
+                  ),
                 ),
               ),
-            ),
 
             // Bottom Gradient
             Positioned(
@@ -206,7 +222,7 @@ class PopularUserCard extends StatelessWidget {
                   Expanded(
                     child: Row(
                       children: [
-                        Text("🔥", style: TextStyle(fontSize: 11)),
+                        Text("🔥", style: const TextStyle(fontSize: 11)),
                         const SizedBox(width: 2),
                         Flexible(
                           child: Text(
@@ -230,7 +246,7 @@ class PopularUserCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      "${CustomFormatNumber.convert(score)}",
+                      "$metricLabel ${CustomFormatNumber.convert(displayValue)}",
                       style: AppFontStyle.styleW700(Colors.white, 11),
                     ),
                   ),
@@ -244,45 +260,17 @@ class PopularUserCard extends StatelessWidget {
   }
 
   void _openPkMatch(BuildContext context) {
-    if (user.liveHistoryId != null && user.liveHistoryId!.isNotEmpty) {
-      if (user.isFake == true) {
-        Get.toNamed(AppRoutes.fakeLivePage, arguments: {
-          "isHost": false,
-          "isFollow": false,
-          "roomId": user.liveHistoryId ?? "",
-          "userId": user.id ?? "",
-          "userName": user.userName ?? "",
-          "name": user.name ?? "",
-          "image": user.image ?? "",
-          "videoUrl": "",
-          "host2Image": user.image ?? "",
-          "host2VideoUrl": "",
-          "isPkMode": true,
-        });
-      } else {
-        Get.to(
-          MultiLivePageView(
-            userId: user.id ?? "",
-            liveUserObjId: user.liveUserObjId ?? "",
-            liveHistoryId: user.liveHistoryId ?? "",
-            isHost: false,
-          ),
-        );
-      }
+    if (user.isLive == true && user.liveHistoryId != null && user.liveHistoryId!.isNotEmpty) {
+      Get.to(
+        () => MultiLivePageView(
+          userId: user.id ?? "",
+          liveUserObjId: user.liveUserObjId ?? "",
+          liveHistoryId: user.liveHistoryId ?? "",
+          isHost: false,
+        ),
+      );
     } else {
-      Get.toNamed(AppRoutes.fakeLivePage, arguments: {
-        "isHost": false,
-        "isFollow": false,
-        "roomId": "pk_${user.id ?? "room"}",
-        "userId": user.id ?? "",
-        "userName": user.userName ?? "",
-        "name": user.name ?? "",
-        "image": user.image ?? "",
-        "videoUrl": "",
-        "host2Image": user.image ?? "",
-        "host2VideoUrl": "",
-        "isPkMode": true,
-      });
+      Get.toNamed(AppRoutes.previewUserProfilePage, arguments: user.id ?? "");
     }
   }
 }
@@ -440,32 +428,13 @@ class PkMatchCard extends StatelessWidget {
   }
 
   void _openPkLive(BuildContext context) {
-    if (liveData.isFake == true) {
-      final List pkImages = liveData.pkPreviewImages ?? [];
-      final List pkVideoUrl = liveData.pkMediaSources ?? [];
-
-      Get.toNamed(AppRoutes.fakeLivePage, arguments: {
-        "isHost": false,
-        "isFollow": liveData.isFollow ?? false,
-        "roomId": liveData.liveHistoryId ?? "",
-        "userId": liveData.userId ?? "",
-        "userName": liveData.userName ?? "",
-        "name": liveData.name ?? "",
-        "image": pkImages.isNotEmpty ? pkImages[0] : (liveData.videoImage ?? liveData.image ?? ""),
-        "videoUrl": pkVideoUrl.isNotEmpty ? pkVideoUrl[0] : (liveData.videoUrl ?? ""),
-        "host2Image": pkImages.length >= 2 ? pkImages[1] : (liveData.host2Image ?? liveData.image ?? ""),
-        "host2VideoUrl": pkVideoUrl.length >= 2 ? pkVideoUrl[1] : (liveData.videoUrl ?? ""),
-        "isPkMode": true,
-      });
-    } else {
-      Get.to(
-        MultiLivePageView(
-          userId: liveData.userId ?? "",
-          liveUserObjId: liveData.liveUserObjId ?? "",
-          liveHistoryId: liveData.liveHistoryId ?? "",
-          isHost: false,
-        ),
-      );
-    }
+    Get.to(
+      () => MultiLivePageView(
+        userId: liveData.userId ?? "",
+        liveUserObjId: liveData.liveUserObjId ?? "",
+        liveHistoryId: liveData.liveHistoryId ?? "",
+        isHost: false,
+      ),
+    );
   }
 }

@@ -109,7 +109,7 @@ class FeedView extends StatelessWidget {
           if (c.pkMatches.isEmpty) {
             return SizedBox(
               height: Get.width,
-              child: const NoDataFoundUi(iconSize: 140, fontSize: 18, text: "No active PK matches found"),
+              child: const NoDataFoundUi(iconSize: 140, fontSize: 16, text: "No live PK matches right now"),
             );
           }
           return GridView.builder(

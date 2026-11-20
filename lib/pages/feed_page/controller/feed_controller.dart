@@ -146,38 +146,76 @@ class FeedController extends GetxController {
       update(["onGetPopular"]);
     }
 
-    final model = await FetchPopularUserApi.callApi();
-    if (model?.data != null && model!.data!.isNotEmpty) {
-      popularUsers.addAll(model.data!);
-    }
+    final List<PopularUser> liveStreamers = [];
+    final List<PopularUser> popularList = [];
 
-    // Also fetch live and PK streamers and append them after popular users
+    // 1. Fetch active RTC live streamers & PK matches from live system
     try {
       final liveModel = await FetchLiveUserApi.callApi(loginUserId: Database.loginUserId);
       if (liveModel?.liveUserList != null && liveModel!.liveUserList!.isNotEmpty) {
         for (final u in liveModel.liveUserList!) {
-          if (!popularUsers.any((p) => p.id == u.userId)) {
-            popularUsers.add(PopularUser(
-              id: u.userId,
-              name: u.name,
-              userName: u.userName,
-              image: u.image ?? u.videoImage,
-              isVerified: u.isVerified,
-              isFake: u.isFake,
-              coin: (u.view ?? 1) * 120,
-              receivedCoin: (u.view ?? 1) * 550,
-              receivedGift: (u.view ?? 1) * 3,
+          liveStreamers.add(PopularUser(
+            id: u.userId,
+            name: u.name,
+            userName: u.userName,
+            image: (u.pkPreviewImages != null && u.pkPreviewImages!.isNotEmpty)
+                ? u.pkPreviewImages![0]
+                : (u.image ?? u.videoImage),
+            isVerified: u.isVerified,
+            isFake: u.isFake,
+            coin: u.view ?? 0,
+            receivedCoin: (u.isPkMode == true) ? 1 : 0,
+            receivedGift: 0,
+            isLive: true,
+            liveUserObjId: u.liveUserObjId,
+            liveHistoryId: u.liveHistoryId,
+            isPkMode: u.isPkMode ?? false,
+          ));
+        }
+      }
+    } catch (e) {
+      Utils.showLog("Error fetching live users for popular section: $e");
+    }
+
+    // 2. Fetch popular users from backend
+    try {
+      final model = await FetchPopularUserApi.callApi();
+      if (model?.data != null && model!.data!.isNotEmpty) {
+        for (final popUser in model.data!) {
+          // If already in live list, update live metadata
+          final liveIdx = liveStreamers.indexWhere((l) => l.id == popUser.id);
+          if (liveIdx != -1) {
+            final liveItem = liveStreamers[liveIdx];
+            liveStreamers[liveIdx] = PopularUser(
+              id: popUser.id,
+              name: popUser.name ?? liveItem.name,
+              userName: popUser.userName ?? liveItem.userName,
+              image: popUser.image ?? liveItem.image,
+              isVerified: popUser.isVerified ?? liveItem.isVerified,
+              isFake: popUser.isFake ?? liveItem.isFake,
+              coin: popUser.coin,
+              receivedCoin: popUser.receivedCoin,
+              receivedGift: popUser.receivedGift,
+              countryFlagImage: popUser.countryFlagImage,
               isLive: true,
-              liveUserObjId: u.liveUserObjId,
-              liveHistoryId: u.liveHistoryId,
-              isPkMode: u.isPkMode,
-            ));
+              liveUserObjId: liveItem.liveUserObjId,
+              liveHistoryId: liveItem.liveHistoryId,
+              isPkMode: liveItem.isPkMode,
+            );
+          } else {
+            popularList.add(popUser);
           }
         }
       }
     } catch (e) {
-      Utils.showLog("Error appending live users to popular list: $e");
+      Utils.showLog("Error fetching popular users: $e");
     }
+
+    // Sort live streamers so active PK matches appear first
+    liveStreamers.sort((a, b) => (b.isPkMode == true ? 1 : 0).compareTo(a.isPkMode == true ? 1 : 0));
+
+    // Live PK & live streaming show first, followed by the rest of the popular users
+    popularUsers = [...liveStreamers, ...popularList];
 
     isLoadingPopular = false;
     update(["onGetPopular"]);
@@ -191,13 +229,15 @@ class FeedController extends GetxController {
       update(["onGetPkMatches"]);
     }
 
-    final model = await FetchLiveUserApi.callApi(loginUserId: Database.loginUserId);
-    if (model?.liveUserList != null && model!.liveUserList!.isNotEmpty) {
-      final list = model.liveUserList!;
-      // Filter or sort so PK mode users appear first
-      final pkOnly = list.where((u) => u.isPkMode == true || (u.pkPreviewImages?.isNotEmpty ?? false)).toList();
-      final others = list.where((u) => u.isPkMode != true && (u.pkPreviewImages?.isEmpty ?? true)).toList();
-      pkMatches.addAll([...pkOnly, ...others]);
+    try {
+      final model = await FetchLiveUserApi.callApi(loginUserId: Database.loginUserId);
+      if (model?.liveUserList != null && model!.liveUserList!.isNotEmpty) {
+        // Only active live PK matches cards should show
+        final pkOnly = model.liveUserList!.where((u) => u.isPkMode == true).toList();
+        pkMatches.addAll(pkOnly);
+      }
+    } catch (e) {
+      Utils.showLog("Error fetching PK matches: $e");
     }
 
     isLoadingPkMatches = false;
